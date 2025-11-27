@@ -29,11 +29,26 @@ type RegisterRequest struct {
 	RoleID   string `json:"role_id"`
 }
 
-// LoginResponse represents login response
+// UserProfile represents user profile in response
+type UserProfile struct {
+	ID          string   `json:"id"`
+	Username    string   `json:"username"`
+	FullName    string   `json:"fullName"`
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
+}
+
+// LoginResponseData represents data inside login response
+type LoginResponseData struct {
+	Token        string      `json:"token"`
+	RefreshToken string      `json:"refreshToken"`
+	User         UserProfile `json:"user"`
+}
+
+// LoginResponse represents login response wrapper
 type LoginResponse struct {
-	Token   string `json:"token"`
-	UserID  string `json:"user_id"`
-	Message string `json:"message"`
+	Status string            `json:"status"`
+	Data   LoginResponseData `json:"data"`
 }
 
 // RegisterResponse represents register response

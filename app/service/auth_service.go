@@ -25,7 +25,7 @@ func NewAuthService(userRepo *repository.UserRepository) *AuthService {
 	}
 }
 
-// Login authenticates user and returns JWT token
+// Login authenticates user and returns JWT token with new format
 func (s *AuthService) Login(loginReq *models.LoginCredential) (*models.LoginResponse, error) {
 	// Validate input
 	if loginReq.Username == "" {
@@ -81,11 +81,29 @@ func (s *AuthService) Login(loginReq *models.LoginCredential) (*models.LoginResp
 		return nil, err
 	}
 
-	// Build response
+	// Generate refresh token
+	refreshToken, err := utils.GenerateRefreshToken(userWithPerms)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build user profile
+	userProfile := models.UserProfile{
+		ID:          userWithPerms.ID,
+		Username:    userWithPerms.Username,
+		FullName:    userWithPerms.FullName,
+		Role:        role.Name,
+		Permissions: permissionNames,
+	}
+
+	// Build response in new format
 	response := &models.LoginResponse{
-		Token:   token,
-		UserID:  userWithPerms.ID,
-		Message: "Login successful",
+		Status: "success",
+		Data: models.LoginResponseData{
+			Token:        token,
+			RefreshToken: refreshToken,
+			User:         userProfile,
+		},
 	}
 
 	return response, nil
