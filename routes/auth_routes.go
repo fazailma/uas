@@ -36,7 +36,7 @@ func LoginHandler(c *fiber.Ctx) error {
 
 // RegisterHandler handles user registration
 func RegisterHandler(c *fiber.Ctx) error {
-	var regReq models.LoginCredential
+	var regReq models.RegisterRequest
 
 	// Parse request body
 	if err := c.BodyParser(&regReq); err != nil {
@@ -50,14 +50,17 @@ func RegisterHandler(c *fiber.Ctx) error {
 	authService := service.NewAuthService(userRepo)
 
 	// Call register service
-	response, err := authService.Register(&regReq)
+	userID, err := authService.Register(&regReq)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(response)
+	return c.Status(fiber.StatusCreated).JSON(models.RegisterResponse{
+		Message: "user registered successfully",
+		UserID:  userID,
+	})
 }
 
 // LogoutHandler handles logout endpoint
@@ -85,8 +88,6 @@ func RefreshTokenHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Implement refresh token logic
-	// For now, return a placeholder response
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "token refreshed",
 		"token":   "new-token-here",

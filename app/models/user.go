@@ -20,9 +20,24 @@ type LoginCredential struct {
 	Password string `json:"password"`
 }
 
+// RegisterRequest represents register request with additional fields
+type RegisterRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+	FullName string `json:"full_name"`
+	RoleID   string `json:"role_id"`
+}
+
 // LoginResponse represents login response
 type LoginResponse struct {
 	Token   string `json:"token"`
 	UserID  string `json:"user_id"`
 	Message string `json:"message"`
+}
+
+// RegisterResponse represents register response
+type RegisterResponse struct {
+	Message string `json:"message"`
+	UserID  string `json:"user_id"`
 }
