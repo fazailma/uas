@@ -13,14 +13,14 @@ func NewAchievementRepository() *AchievementRepository {
 	return &AchievementRepository{}
 }
 
-// Create creates a new achievement
-func (r *AchievementRepository) Create(achievement *models.Achievement) error {
+// Create creates a new achievement (FR-003)
+func (r *AchievementRepository) Create(achievement *models.AchievementReference) error {
 	return database.DB.Create(achievement).Error
 }
 
 // FindByID finds achievement by ID
-func (r *AchievementRepository) FindByID(id string) (*models.Achievement, error) {
-	var achievement models.Achievement
+func (r *AchievementRepository) FindByID(id string) (*models.AchievementReference, error) {
+	var achievement models.AchievementReference
 	err := database.DB.Where("id = ?", id).First(&achievement).Error
 	if err != nil {
 		return nil, err
@@ -29,8 +29,8 @@ func (r *AchievementRepository) FindByID(id string) (*models.Achievement, error)
 }
 
 // FindByStudentID finds all achievements by student ID
-func (r *AchievementRepository) FindByStudentID(studentID string) ([]models.Achievement, error) {
-	var achievements []models.Achievement
+func (r *AchievementRepository) FindByStudentID(studentID string) ([]models.AchievementReference, error) {
+	var achievements []models.AchievementReference
 	err := database.DB.Where("student_id = ?", studentID).Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
@@ -38,9 +38,20 @@ func (r *AchievementRepository) FindByStudentID(studentID string) ([]models.Achi
 	return achievements, nil
 }
 
+// FindDraftByStudentID finds all draft achievements by student ID
+func (r *AchievementRepository) FindDraftByStudentID(studentID string) ([]models.AchievementReference, error) {
+	var achievements []models.AchievementReference
+	err := database.DB.Where("student_id = ? AND status = ?", studentID, "draft").
+		Order("created_at DESC").Find(&achievements).Error
+	if err != nil {
+		return nil, err
+	}
+	return achievements, nil
+}
+
 // FindAll finds all achievements (admin view)
-func (r *AchievementRepository) FindAll() ([]models.Achievement, error) {
-	var achievements []models.Achievement
+func (r *AchievementRepository) FindAll() ([]models.AchievementReference, error) {
+	var achievements []models.AchievementReference
 	err := database.DB.Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
@@ -49,23 +60,23 @@ func (r *AchievementRepository) FindAll() ([]models.Achievement, error) {
 }
 
 // Update updates an achievement
-func (r *AchievementRepository) Update(id string, achievement *models.Achievement) error {
-	return database.DB.Model(&models.Achievement{}).Where("id = ?", id).Updates(achievement).Error
+func (r *AchievementRepository) Update(id string, achievement *models.AchievementReference) error {
+	return database.DB.Model(&models.AchievementReference{}).Where("id = ?", id).Updates(achievement).Error
 }
 
-// UpdateStatus updates achievement status
+// UpdateStatus updates achievement status (FR-004)
 func (r *AchievementRepository) UpdateStatus(id string, status string) error {
-	return database.DB.Model(&models.Achievement{}).Where("id = ?", id).Update("status", status).Error
+	return database.DB.Model(&models.AchievementReference{}).Where("id = ?", id).Update("status", status).Error
 }
 
-// Delete deletes an achievement
+// Delete soft delete an achievement (FR-005)
 func (r *AchievementRepository) Delete(id string) error {
-	return database.DB.Where("id = ?", id).Delete(&models.Achievement{}).Error
+	return database.DB.Where("id = ?", id).Delete(&models.AchievementReference{}).Error
 }
 
 // FindByStatus finds achievements by status
-func (r *AchievementRepository) FindByStatus(status string) ([]models.Achievement, error) {
-	var achievements []models.Achievement
+func (r *AchievementRepository) FindByStatus(status string) ([]models.AchievementReference, error) {
+	var achievements []models.AchievementReference
 	err := database.DB.Where("status = ?", status).Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err

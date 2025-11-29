@@ -28,4 +28,7 @@ func ConnectPostgres() {
 
 	DB = db
 	log.Println("PostgreSQL Connected")
+
+	// Run migrations
+	RunMigrations(db)
 }

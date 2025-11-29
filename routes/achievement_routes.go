@@ -12,14 +12,21 @@ func SetupAchievementRoutes(app *fiber.App) {
 
 	achievements := app.Group("/api/v1/achievements", middleware.AuthMiddleware)
 
+	// List achievements
 	achievements.Get("/", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementListHandler)
+
+	// Get achievement detail
 	achievements.Get("/:id", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementDetailHandler)
+
+	// FR-003: Create/Submit achievement
 	achievements.Post("/", middleware.RBACMiddleware("achievement:create"), achievementService.AchievementCreateHandler)
-	achievements.Put("/:id", middleware.RBACMiddleware("achievement:update"), achievementService.AchievementUpdateHandler)
-	achievements.Delete("/:id", middleware.RBACMiddleware("achievement:delete"), achievementService.AchievementDeleteHandler)
+
+	// FR-004: Submit achievement for verification
 	achievements.Post("/:id/submit", middleware.RBACMiddleware("achievement:submit"), achievementService.AchievementSubmitHandler)
-	achievements.Post("/:id/verify", middleware.RBACMiddleware("achievement:verify"), achievementService.AchievementVerifyHandler)
-	achievements.Post("/:id/reject", middleware.RBACMiddleware("achievement:reject"), achievementService.AchievementRejectHandler)
-	achievements.Get("/:id/history", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementHistoryHandler)
-	achievements.Post("/:id/attachments", middleware.RBACMiddleware("achievement:upload"), achievementService.AchievementUploadAttachmentHandler)
+
+	// Update achievement
+	achievements.Put("/:id", middleware.RBACMiddleware("achievement:update"), achievementService.AchievementUpdateHandler)
+
+	// FR-005: Delete achievement
+	achievements.Delete("/:id", middleware.RBACMiddleware("achievement:delete"), achievementService.AchievementDeleteHandler)
 }

@@ -4,12 +4,12 @@ import "time"
 
 type User struct {
 	ID           string    `json:"id" gorm:"primaryKey"`
-	Username     string    `json:"username" gorm:"uniqueIndex"`
-	Email        string    `json:"email" gorm:"uniqueIndex"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
 	PasswordHash string    `json:"password_hash"`
 	FullName     string    `json:"full_name"`
 	RoleID       string    `json:"role_id"`
-	IsActive     bool      `json:"is_active" gorm:"default:true"`
+	IsActive     bool      `json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
