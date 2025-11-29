@@ -18,7 +18,7 @@ func main() {
 		log.Println("Warning: .env not found")
 	}
 
-	// Connect DB
+	// Connect PostgreSQL
 	database.ConnectPostgres()
 
 	// Create Fiber app
@@ -38,7 +38,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New())
 
-	// Setup routes - INI YANG KURANG!
+	// Setup routes
 	routes.SetupRoutes(app)
 
 	// Health check endpoint
