@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -12,12 +13,14 @@ import (
 )
 
 type AchievementService struct {
-	repo *repository.AchievementRepository
+	pgRepo    *repository.AchievementRepository
+	mongoRepo *repository.MongoAchievementRepository
 }
 
 func NewAchievementService() *AchievementService {
 	return &AchievementService{
-		repo: repository.NewAchievementRepository(),
+		pgRepo:    repository.NewAchievementRepository(),
+		mongoRepo: repository.NewMongoAchievementRepository(),
 	}
 }
 
@@ -46,7 +49,7 @@ func (s *AchievementService) AchievementCreateHandler(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status":  "success",
-		"message": "Prestasi berhasil disubmit",
+		"message": "Prestasi berhasil dibuat",
 		"data":    achievement,
 	})
 }
@@ -172,6 +175,8 @@ func (s *AchievementService) AchievementDetailHandler(c *fiber.Ctx) error {
 
 // Business Logic Methods
 
+// CreateAchievement creates achievement in both MongoDB and PostgreSQL
+// FR-003: Submit Prestasi
 func (s *AchievementService) CreateAchievement(userID, role string, req models.AchievementCreateRequest) (*models.AchievementReference, error) {
 	// Validate required fields
 	if req.Title == "" || req.Category == "" || req.Date == "" {
@@ -183,25 +188,48 @@ func (s *AchievementService) CreateAchievement(userID, role string, req models.A
 		return nil, errors.New("only mahasiswa can submit achievements")
 	}
 
-	achievement := &models.AchievementReference{
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Create MongoDB document with full achievement details
+	mongoAchievement := &models.MongoAchievement{
+		StudentID:   userID,
+		Title:       req.Title,
+		Description: req.Description,
+		Category:    req.Category,
+		Date:        req.Date,
+		ProofURL:    req.ProofURL,
+	}
+
+	mongoAch, err := s.mongoRepo.Create(ctx, mongoAchievement)
+	if err != nil {
+		return nil, errors.New("failed to save achievement to MongoDB: " + err.Error())
+	}
+
+	// 2. Create PostgreSQL reference
+	pgAchievement := &models.AchievementReference{
 		ID:                 uuid.New().String(),
 		StudentID:          userID,
-		MongoAchievementID: uuid.New().String(), // Will store MongoDB ID when data is saved to MongoDB
+		MongoAchievementID: mongoAch.ID.Hex(),
 		Status:             "draft",
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 	}
 
-	err := s.repo.Create(achievement)
+	err = s.pgRepo.Create(pgAchievement)
 	if err != nil {
-		return nil, err
+		// Rollback MongoDB if PostgreSQL fails
+		s.mongoRepo.SoftDelete(ctx, mongoAch.ID.Hex())
+		return nil, errors.New("failed to save achievement reference to PostgreSQL: " + err.Error())
 	}
 
-	return achievement, nil
+	return pgAchievement, nil
 }
 
+// SubmitAchievement updates achievement status to 'submitted'
+// FR-004: Submit untuk Verifikasi
 func (s *AchievementService) SubmitAchievement(id, userID, role string) error {
-	achievement, err := s.repo.FindByID(id)
+	achievement, err := s.pgRepo.FindByID(id)
 	if err != nil {
 		return errors.New("achievement not found")
 	}
@@ -216,8 +244,8 @@ func (s *AchievementService) SubmitAchievement(id, userID, role string) error {
 		return errors.New("only draft achievements can be submitted")
 	}
 
-	// Update status to submitted
-	err = s.repo.UpdateStatus(id, "submitted")
+	// Update status to submitted in PostgreSQL
+	err = s.pgRepo.UpdateStatus(id, "submitted")
 	if err != nil {
 		return err
 	}
@@ -227,42 +255,107 @@ func (s *AchievementService) SubmitAchievement(id, userID, role string) error {
 	return nil
 }
 
+// UpdateAchievement updates achievement details (only draft)
+func (s *AchievementService) UpdateAchievement(id, userID, role string, req models.AchievementUpdateRequest) (*models.AchievementReference, error) {
+	pgAchievement, err := s.pgRepo.FindByID(id)
+	if err != nil {
+		return nil, errors.New("achievement not found")
+	}
+
+	// Ownership check - only mahasiswa can update their own
+	if role == "Mahasiswa" && pgAchievement.StudentID != userID {
+		return nil, errors.New("you can only update your own achievements")
+	}
+
+	// Can only update draft achievements
+	if pgAchievement.Status != "draft" {
+		return nil, errors.New("only draft achievements can be updated")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Update MongoDB document
+	mongoID := pgAchievement.MongoAchievementID
+	mongoAch := &models.MongoAchievement{
+		StudentID:   userID,
+		Title:       req.Title,
+		Description: req.Description,
+		Category:    req.Category,
+		Date:        req.Date,
+		ProofURL:    req.ProofURL,
+	}
+
+	_, err = s.mongoRepo.Update(ctx, mongoID, mongoAch)
+	if err != nil {
+		return nil, errors.New("failed to update achievement in MongoDB: " + err.Error())
+	}
+
+	// Update PostgreSQL reference timestamp
+	pgAchievement.UpdatedAt = time.Now()
+	err = s.pgRepo.Update(id, pgAchievement)
+	if err != nil {
+		return nil, errors.New("failed to update achievement reference in PostgreSQL: " + err.Error())
+	}
+
+	return pgAchievement, nil
+}
+
+// DeleteAchievement soft deletes achievement from both MongoDB and marks PostgreSQL
+// FR-005: Hapus Prestasi
 func (s *AchievementService) DeleteAchievement(id, userID, role string) error {
-	achievement, err := s.repo.FindByID(id)
+	pgAchievement, err := s.pgRepo.FindByID(id)
 	if err != nil {
 		return errors.New("achievement not found")
 	}
 
 	// Ownership check - only mahasiswa can delete their own
-	if role == "Mahasiswa" && achievement.StudentID != userID {
+	if role == "Mahasiswa" && pgAchievement.StudentID != userID {
 		return errors.New("you can only delete your own achievements")
 	}
 
 	// Can only delete draft
-	if achievement.Status != "draft" {
+	if pgAchievement.Status != "draft" {
 		return errors.New("only draft achievements can be deleted")
 	}
 
-	// Soft delete
-	return s.repo.Delete(id)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Soft delete MongoDB document
+	mongoID := pgAchievement.MongoAchievementID
+	err = s.mongoRepo.SoftDelete(ctx, mongoID)
+	if err != nil {
+		return errors.New("failed to delete achievement from MongoDB: " + err.Error())
+	}
+
+	// 2. Soft delete PostgreSQL reference
+	err = s.pgRepo.Delete(id)
+	if err != nil {
+		return errors.New("failed to delete achievement reference from PostgreSQL: " + err.Error())
+	}
+
+	return nil
 }
 
+// ListAchievements lists achievements based on user role
 func (s *AchievementService) ListAchievements(userID, role string) ([]models.AchievementReference, error) {
 	switch role {
 	case "Admin":
-		return s.repo.FindAll()
+		return s.pgRepo.FindAll()
 	case "Mahasiswa":
-		return s.repo.FindByStudentID(userID)
+		return s.pgRepo.FindByStudentID(userID)
 	case "Dosen Wali":
 		// TODO: Implement logic to find students under guidance
 		return []models.AchievementReference{}, nil
 	default:
-		return s.repo.FindAll()
+		return s.pgRepo.FindAll()
 	}
 }
 
+// GetAchievementDetail gets achievement details with ownership check
 func (s *AchievementService) GetAchievementDetail(id, userID, role string) (*models.AchievementReference, error) {
-	achievement, err := s.repo.FindByID(id)
+	achievement, err := s.pgRepo.FindByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -270,38 +363,6 @@ func (s *AchievementService) GetAchievementDetail(id, userID, role string) (*mod
 	// Ownership check for Mahasiswa
 	if role == "Mahasiswa" && achievement.StudentID != userID {
 		return nil, errors.New("you can only view your own achievements")
-	}
-
-	return achievement, nil
-}
-
-func (s *AchievementService) UpdateAchievement(id, userID, role string, req models.AchievementUpdateRequest) (*models.AchievementReference, error) {
-	achievement, err := s.repo.FindByID(id)
-	if err != nil {
-		return nil, errors.New("achievement not found")
-	}
-
-	// Ownership check - only mahasiswa can update their own
-	if role == "Mahasiswa" && achievement.StudentID != userID {
-		return nil, errors.New("you can only update your own achievements")
-	}
-
-	// Can only update draft achievements
-	if achievement.Status != "draft" {
-		return nil, errors.New("only draft achievements can be updated")
-	}
-
-	// Update fields if provided
-	if req.Title != "" {
-		// Use the existing achievement data, we'll store it in MongoDB later
-		// For now, we just mark it as updated
-	}
-
-	achievement.UpdatedAt = time.Now()
-
-	err = s.repo.Update(id, achievement)
-	if err != nil {
-		return nil, err
 	}
 
 	return achievement, nil

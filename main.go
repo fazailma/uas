@@ -21,6 +21,10 @@ func main() {
 	// Connect PostgreSQL
 	database.ConnectPostgres()
 
+	// Connect MongoDB
+	database.ConnectMongoDB()
+	defer database.DisconnectMongoDB()
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
