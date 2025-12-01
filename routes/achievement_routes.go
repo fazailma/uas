@@ -12,21 +12,33 @@ func SetupAchievementRoutes(app *fiber.App) {
 
 	achievements := app.Group("/api/v1/achievements", middleware.AuthMiddleware)
 
-	// List achievements
+	// GET /api/v1/achievements - List (filtered by role)
 	achievements.Get("/", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementListHandler)
 
-	// Get achievement detail
+	// GET /api/v1/achievements/:id - Detail
 	achievements.Get("/:id", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementDetailHandler)
 
-	// FR-003: Create/Submit achievement
+	// POST /api/v1/achievements - Create (Mahasiswa)
 	achievements.Post("/", middleware.RBACMiddleware("achievement:create"), achievementService.AchievementCreateHandler)
 
-	// FR-004: Submit achievement for verification
-	achievements.Post("/:id/submit", middleware.RBACMiddleware("achievement:submit"), achievementService.AchievementSubmitHandler)
-
-	// Update achievement
+	// PUT /api/v1/achievements/:id - Update (Mahasiswa)
 	achievements.Put("/:id", middleware.RBACMiddleware("achievement:update"), achievementService.AchievementUpdateHandler)
 
-	// FR-005: Delete achievement
+	// DELETE /api/v1/achievements/:id - Delete (Mahasiswa)
 	achievements.Delete("/:id", middleware.RBACMiddleware("achievement:delete"), achievementService.AchievementDeleteHandler)
+
+	// POST /api/v1/achievements/:id/submit - Submit for verification
+	achievements.Post("/:id/submit", middleware.RBACMiddleware("achievement:submit"), achievementService.AchievementSubmitHandler)
+
+	// POST /api/v1/achievements/:id/verify - Verify (Dosen Wali)
+	achievements.Post("/:id/verify", middleware.RBACMiddleware("achievement:verify"), achievementService.VerifyAchievementHandler)
+
+	// POST /api/v1/achievements/:id/reject - Reject (Dosen Wali)
+	achievements.Post("/:id/reject", middleware.RBACMiddleware("achievement:verify"), achievementService.RejectAchievementHandler)
+
+	// GET /api/v1/achievements/:id/history - Status history
+	achievements.Get("/:id/history", middleware.RBACMiddleware("achievement:read"), achievementService.AchievementHistoryHandler)
+
+	// POST /api/v1/achievements/:id/attachments - Upload files
+	achievements.Post("/:id/attachments", middleware.RBACMiddleware("achievement:update"), achievementService.AchievementUploadHandler)
 }

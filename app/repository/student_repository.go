@@ -47,3 +47,13 @@ func (r *StudentRepository) Update(id string, student *models.Student) error {
 func (r *StudentRepository) Delete(id string) error {
 	return database.DB.Where("id = ?", id).Delete(&models.Student{}).Error
 }
+
+// FindByAdvisorID finds all students guided by an advisor
+func (r *StudentRepository) FindByAdvisorID(advisorID string) ([]models.Student, error) {
+	var students []models.Student
+	err := database.DB.Where("advisor_id = ?", advisorID).Find(&students).Error
+	if err != nil {
+		return nil, err
+	}
+	return students, nil
+}

@@ -13,7 +13,9 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "missing authorization header",
+			"status": "error",
+			"code":   401,
+			"error":  "missing authorization header",
 		})
 	}
 
@@ -21,7 +23,9 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid authorization header format",
+			"status": "error",
+			"code":   401,
+			"error":  "invalid authorization header format",
 		})
 	}
 
@@ -41,7 +45,9 @@ func AuthMiddleware(c *fiber.Ctx) error {
 
 	if err != nil || !token.Valid {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid or expired token",
+			"status": "error",
+			"code":   401,
+			"error":  "invalid or expired token",
 		})
 	}
 

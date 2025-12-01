@@ -18,7 +18,8 @@ func RBACMiddleware(requiredPermission string) fiber.Handler {
 		permissionsInterface := c.Locals("permissions")
 		if permissionsInterface == nil {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"status": "forbidden",
+				"status": "error",
+				"code":   403,
 				"error":  "no permissions found in token",
 			})
 		}
@@ -36,7 +37,8 @@ func RBACMiddleware(requiredPermission string) fiber.Handler {
 			}
 		default:
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"status": "forbidden",
+				"status": "error",
+				"code":   403,
 				"error":  "invalid permissions format",
 			})
 		}
@@ -45,7 +47,8 @@ func RBACMiddleware(requiredPermission string) fiber.Handler {
 		hasPermission := hasPermission(permissions, requiredPermission)
 		if !hasPermission {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"status": "forbidden",
+				"status": "error",
+				"code":   403,
 				"error":  fmt.Sprintf("missing required permission: %s", requiredPermission),
 			})
 		}

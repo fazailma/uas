@@ -83,3 +83,34 @@ func (r *AchievementRepository) FindByStatus(status string) ([]models.Achievemen
 	}
 	return achievements, nil
 }
+
+// FindByStudentIDs finds achievements by multiple student IDs
+func (r *AchievementRepository) FindByStudentIDs(studentIDs []string) ([]models.AchievementReference, error) {
+	var achievements []models.AchievementReference
+	err := database.DB.Where("student_id IN ?", studentIDs).Order("created_at DESC").Find(&achievements).Error
+	if err != nil {
+		return nil, err
+	}
+	return achievements, nil
+}
+
+// VerifyAchievement verifies an achievement (FR-007)
+func (r *AchievementRepository) VerifyAchievement(id string, verifiedBy string) error {
+	return database.DB.Model(&models.AchievementReference{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":      "verified",
+			"verified_by": verifiedBy,
+			"verified_at": database.DB.Statement.DB.NowFunc(),
+		}).Error
+}
+
+// RejectAchievement rejects an achievement with note (FR-008)
+func (r *AchievementRepository) RejectAchievement(id string, rejectionNote string) error {
+	return database.DB.Model(&models.AchievementReference{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":         "rejected",
+			"rejection_note": rejectionNote,
+		}).Error
+}

@@ -21,4 +21,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Setup achievement routes
 	SetupAchievementRoutes(app)
+
+	// Setup verification routes (for dosen wali)
+	SetupVerificationRoutes(app)
 }

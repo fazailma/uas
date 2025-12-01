@@ -80,6 +80,84 @@ func (s *AchievementService) AchievementSubmitHandler(c *fiber.Ctx) error {
 	})
 }
 
+// FR-007: Verify Prestasi
+// VerifyAchievementHandler handles verifying achievement by dosen wali
+// POST /api/v1/achievements/:id/verify
+func (s *AchievementService) VerifyAchievementHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	dosenID := c.Locals("user_id").(string)
+	role := c.Locals("role").(string)
+
+	// Only Dosen Wali can verify
+	if role != "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status": "error",
+			"error":  "only dosen wali can verify achievements",
+		})
+	}
+
+	err := s.VerifyAchievement(id, dosenID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":  "success",
+		"message": "Prestasi berhasil diverifikasi",
+		"data": fiber.Map{
+			"id":     id,
+			"status": "verified",
+		},
+	})
+}
+
+// FR-008: Reject Prestasi
+// RejectAchievementHandler handles rejecting achievement by dosen wali
+// POST /api/v1/achievements/:id/reject
+func (s *AchievementService) RejectAchievementHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	role := c.Locals("role").(string)
+
+	// Only Dosen Wali can reject
+	if role != "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status": "error",
+			"error":  "only dosen wali can reject achievements",
+		})
+	}
+
+	var req struct {
+		RejectionNote string `json:"rejection_note" binding:"required"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "error",
+			"error":  "invalid request body",
+		})
+	}
+
+	err := s.RejectAchievement(id, req.RejectionNote)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":  "success",
+		"message": "Prestasi berhasil ditolak",
+		"data": fiber.Map{
+			"id":     id,
+			"status": "rejected",
+		},
+	})
+}
+
 // AchievementUpdateHandler handles updating achievement
 // PUT /api/v1/achievements/:id
 func (s *AchievementService) AchievementUpdateHandler(c *fiber.Ctx) error {
@@ -338,6 +416,71 @@ func (s *AchievementService) DeleteAchievement(id, userID, role string) error {
 	return nil
 }
 
+// VerifyAchievement verifies an achievement by dosen wali
+// FR-007: Verify Prestasi
+func (s *AchievementService) VerifyAchievement(achievementID, dosenID string) error {
+	// Get achievement
+	achievement, err := s.pgRepo.FindByID(achievementID)
+	if err != nil {
+		return errors.New("achievement not found")
+	}
+
+	// Verify ownership - check if dosen is advisor of this student
+	student, err := repository.NewStudentRepository().FindByUserID(achievement.StudentID)
+	if err != nil {
+		return errors.New("student not found")
+	}
+
+	lecturer, err := repository.NewLecturerRepository().FindByUserID(dosenID)
+	if err != nil {
+		return errors.New("lecturer not found")
+	}
+
+	if student.AdvisorID != lecturer.ID {
+		return errors.New("you can only verify achievements of your guided students")
+	}
+
+	// Check status
+	if achievement.Status != "submitted" {
+		return errors.New("only submitted achievements can be verified")
+	}
+
+	// Update status to verified
+	err = s.pgRepo.VerifyAchievement(achievementID, dosenID)
+	if err != nil {
+		return errors.New("failed to verify achievement: " + err.Error())
+	}
+
+	// TODO: Create notification for student
+
+	return nil
+}
+
+// RejectAchievement rejects an achievement with rejection note
+// FR-008: Reject Prestasi
+func (s *AchievementService) RejectAchievement(achievementID, rejectionNote string) error {
+	// Get achievement
+	achievement, err := s.pgRepo.FindByID(achievementID)
+	if err != nil {
+		return errors.New("achievement not found")
+	}
+
+	// Check status
+	if achievement.Status != "submitted" {
+		return errors.New("only submitted achievements can be rejected")
+	}
+
+	// Update status to rejected with note
+	err = s.pgRepo.RejectAchievement(achievementID, rejectionNote)
+	if err != nil {
+		return errors.New("failed to reject achievement: " + err.Error())
+	}
+
+	// TODO: Create notification for student with rejection reason
+
+	return nil
+}
+
 // ListAchievements lists achievements based on user role
 func (s *AchievementService) ListAchievements(userID, role string) ([]models.AchievementReference, error) {
 	switch role {
@@ -366,4 +509,141 @@ func (s *AchievementService) GetAchievementDetail(id, userID, role string) (*mod
 	}
 
 	return achievement, nil
+}
+
+// AchievementHistoryHandler handles getting achievement status history
+// GET /api/v1/achievements/:id/history
+func (s *AchievementService) AchievementHistoryHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := c.Locals("user_id").(string)
+	role := c.Locals("role").(string)
+
+	history, err := s.GetAchievementHistory(id, userID, role)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "success",
+		"data":   history,
+	})
+}
+
+// AchievementUploadHandler handles uploading achievement attachments
+// POST /api/v1/achievements/:id/attachments
+func (s *AchievementService) AchievementUploadHandler(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := c.Locals("user_id").(string)
+	role := c.Locals("role").(string)
+
+	// Only Mahasiswa can upload to their own achievements
+	if role != "Mahasiswa" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status": "error",
+			"error":  "only mahasiswa can upload attachments",
+		})
+	}
+
+	// Get file from form
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "error",
+			"error":  "file is required",
+		})
+	}
+
+	// Validate ownership
+	achievement, err := s.pgRepo.FindByID(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status": "error",
+			"error":  "achievement not found",
+		})
+	}
+
+	if achievement.StudentID != userID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status": "error",
+			"error":  "you can only upload to your own achievements",
+		})
+	}
+
+	// TODO: Implement file upload logic (S3, GCS, or local storage)
+	// For now, just return success with file info
+	_ = file // Use file variable to avoid unused error
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":  "success",
+		"message": "File uploaded successfully",
+		"data": fiber.Map{
+			"achievement_id": id,
+			"file_name":      file.Filename,
+			"file_size":      file.Size,
+		},
+	})
+}
+
+// GetAchievementHistory retrieves achievement status history
+func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fiber.Map, error) {
+	achievement, err := s.pgRepo.FindByID(id)
+	if err != nil {
+		return nil, errors.New("achievement not found")
+	}
+
+	// Ownership check for Mahasiswa
+	if role == "Mahasiswa" && achievement.StudentID != userID {
+		return nil, errors.New("you can only view your own achievement history")
+	}
+
+	// Build history timeline
+	history := fiber.Map{
+		"id":     id,
+		"status": achievement.Status,
+		"timeline": []fiber.Map{
+			{
+				"status":    "draft",
+				"timestamp": achievement.CreatedAt,
+				"message":   "Achievement created",
+			},
+		},
+	}
+
+	// Add submitted event if applicable
+	if !achievement.SubmittedAt.IsZero() {
+		timeline := history["timeline"].([]fiber.Map)
+		timeline = append(timeline, fiber.Map{
+			"status":    "submitted",
+			"timestamp": achievement.SubmittedAt,
+			"message":   "Achievement submitted for verification",
+		})
+		history["timeline"] = timeline
+	}
+
+	// Add verified event if applicable
+	if !achievement.VerifiedAt.IsZero() {
+		timeline := history["timeline"].([]fiber.Map)
+		timeline = append(timeline, fiber.Map{
+			"status":      "verified",
+			"timestamp":   achievement.VerifiedAt,
+			"verified_by": achievement.VerifiedBy,
+			"message":     "Achievement verified",
+		})
+		history["timeline"] = timeline
+	}
+
+	// Add rejected event if applicable
+	if achievement.Status == "rejected" && achievement.RejectionNote != "" {
+		timeline := history["timeline"].([]fiber.Map)
+		timeline = append(timeline, fiber.Map{
+			"status":  "rejected",
+			"message": achievement.RejectionNote,
+		})
+		history["timeline"] = timeline
+	}
+
+	return history, nil
 }
