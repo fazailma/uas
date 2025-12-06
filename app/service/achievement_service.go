@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"UAS/app/models"
@@ -23,235 +22,6 @@ func NewAchievementService() *AchievementService {
 		mongoRepo: repository.NewMongoAchievementRepository(),
 	}
 }
-
-// FR-003: Submit Prestasi
-// AchievementCreateHandler handles creating/submitting achievement
-// POST /api/v1/achievements
-func (s *AchievementService) AchievementCreateHandler(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-	var req models.AchievementCreateRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  "invalid request body",
-		})
-	}
-
-	achievement, err := s.CreateAchievement(userID, role, req)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil dibuat",
-		"data":    achievement,
-	})
-}
-
-// FR-004: Submit untuk Verifikasi
-// AchievementSubmitHandler handles submitting achievement for verification
-// POST /api/v1/achievements/:id/submit
-func (s *AchievementService) AchievementSubmitHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	err := s.SubmitAchievement(id, userID, role)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil disubmit untuk verifikasi",
-		"data": fiber.Map{
-			"id":     id,
-			"status": "submitted",
-		},
-	})
-}
-
-// FR-007: Verify Prestasi
-// VerifyAchievementHandler handles verifying achievement by dosen wali
-// POST /api/v1/achievements/:id/verify
-func (s *AchievementService) VerifyAchievementHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	dosenID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	// Only Dosen Wali can verify
-	if role != "Dosen Wali" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only dosen wali can verify achievements",
-		})
-	}
-
-	err := s.VerifyAchievement(id, dosenID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil diverifikasi",
-		"data": fiber.Map{
-			"id":     id,
-			"status": "verified",
-		},
-	})
-}
-
-// FR-008: Reject Prestasi
-// RejectAchievementHandler handles rejecting achievement by dosen wali
-// POST /api/v1/achievements/:id/reject
-func (s *AchievementService) RejectAchievementHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	role := c.Locals("role").(string)
-
-	// Only Dosen Wali can reject
-	if role != "Dosen Wali" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only dosen wali can reject achievements",
-		})
-	}
-
-	var req struct {
-		RejectionNote string `json:"rejection_note" binding:"required"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  "invalid request body",
-		})
-	}
-
-	err := s.RejectAchievement(id, req.RejectionNote)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil ditolak",
-		"data": fiber.Map{
-			"id":     id,
-			"status": "rejected",
-		},
-	})
-}
-
-// AchievementUpdateHandler handles updating achievement
-// PUT /api/v1/achievements/:id
-func (s *AchievementService) AchievementUpdateHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-	var req models.AchievementUpdateRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  "invalid request body",
-		})
-	}
-
-	achievement, err := s.UpdateAchievement(id, userID, role, req)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil diperbarui",
-		"data":    achievement,
-	})
-}
-
-// FR-005: Hapus Prestasi
-// AchievementDeleteHandler handles deleting achievement
-// DELETE /api/v1/achievements/:id
-func (s *AchievementService) AchievementDeleteHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	err := s.DeleteAchievement(id, userID, role)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil dihapus",
-	})
-}
-
-// AchievementListHandler handles listing achievements
-// GET /api/v1/achievements
-func (s *AchievementService) AchievementListHandler(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	achievements, err := s.ListAchievements(userID, role)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status": "error",
-			"error":  "failed to fetch achievements",
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "success",
-		"data":   achievements,
-	})
-}
-
-// AchievementDetailHandler handles getting achievement detail
-// GET /api/v1/achievements/:id
-func (s *AchievementService) AchievementDetailHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	achievement, err := s.GetAchievementDetail(id, userID, role)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"status": "error",
-			"error":  "achievement not found",
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "success",
-		"data":   achievement,
-	})
-}
-
-// Business Logic Methods
 
 // CreateAchievement creates achievement in both MongoDB and PostgreSQL
 // FR-003: Submit Prestasi
@@ -511,84 +281,8 @@ func (s *AchievementService) GetAchievementDetail(id, userID, role string) (*mod
 	return achievement, nil
 }
 
-// AchievementHistoryHandler handles getting achievement status history
-// GET /api/v1/achievements/:id/history
-func (s *AchievementService) AchievementHistoryHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	history, err := s.GetAchievementHistory(id, userID, role)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "success",
-		"data":   history,
-	})
-}
-
-// AchievementUploadHandler handles uploading achievement attachments
-// POST /api/v1/achievements/:id/attachments
-func (s *AchievementService) AchievementUploadHandler(c *fiber.Ctx) error {
-	id := c.Params("id")
-	userID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	// Only Mahasiswa can upload to their own achievements
-	if role != "Mahasiswa" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only mahasiswa can upload attachments",
-		})
-	}
-
-	// Get file from form
-	file, err := c.FormFile("file")
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  "file is required",
-		})
-	}
-
-	// Validate ownership
-	achievement, err := s.pgRepo.FindByID(id)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"status": "error",
-			"error":  "achievement not found",
-		})
-	}
-
-	if achievement.StudentID != userID {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "you can only upload to your own achievements",
-		})
-	}
-
-	// TODO: Implement file upload logic (S3, GCS, or local storage)
-	// For now, just return success with file info
-	_ = file // Use file variable to avoid unused error
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "File uploaded successfully",
-		"data": fiber.Map{
-			"achievement_id": id,
-			"file_name":      file.Filename,
-			"file_size":      file.Size,
-		},
-	})
-}
-
-// GetAchievementHistory retrieves achievement status history
-func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fiber.Map, error) {
+// GetAchievementHistory retrieves achievement status history - pure logic
+func (s *AchievementService) GetAchievementHistory(id, userID, role string) (map[string]interface{}, error) {
 	achievement, err := s.pgRepo.FindByID(id)
 	if err != nil {
 		return nil, errors.New("achievement not found")
@@ -600,10 +294,10 @@ func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fib
 	}
 
 	// Build history timeline
-	history := fiber.Map{
+	history := map[string]interface{}{
 		"id":     id,
 		"status": achievement.Status,
-		"timeline": []fiber.Map{
+		"timeline": []map[string]interface{}{
 			{
 				"status":    "draft",
 				"timestamp": achievement.CreatedAt,
@@ -614,8 +308,8 @@ func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fib
 
 	// Add submitted event if applicable
 	if !achievement.SubmittedAt.IsZero() {
-		timeline := history["timeline"].([]fiber.Map)
-		timeline = append(timeline, fiber.Map{
+		timeline := history["timeline"].([]map[string]interface{})
+		timeline = append(timeline, map[string]interface{}{
 			"status":    "submitted",
 			"timestamp": achievement.SubmittedAt,
 			"message":   "Achievement submitted for verification",
@@ -625,8 +319,8 @@ func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fib
 
 	// Add verified event if applicable
 	if !achievement.VerifiedAt.IsZero() {
-		timeline := history["timeline"].([]fiber.Map)
-		timeline = append(timeline, fiber.Map{
+		timeline := history["timeline"].([]map[string]interface{})
+		timeline = append(timeline, map[string]interface{}{
 			"status":      "verified",
 			"timestamp":   achievement.VerifiedAt,
 			"verified_by": achievement.VerifiedBy,
@@ -637,8 +331,8 @@ func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fib
 
 	// Add rejected event if applicable
 	if achievement.Status == "rejected" && achievement.RejectionNote != "" {
-		timeline := history["timeline"].([]fiber.Map)
-		timeline = append(timeline, fiber.Map{
+		timeline := history["timeline"].([]map[string]interface{})
+		timeline = append(timeline, map[string]interface{}{
 			"status":  "rejected",
 			"message": achievement.RejectionNote,
 		})
@@ -646,4 +340,18 @@ func (s *AchievementService) GetAchievementHistory(id, userID, role string) (fib
 	}
 
 	return history, nil
+}
+
+// ValidateAchievementOwnership checks if user owns the achievement - pure logic
+func (s *AchievementService) ValidateAchievementOwnership(id, userID string) error {
+	achievement, err := s.pgRepo.FindByID(id)
+	if err != nil {
+		return errors.New("achievement not found")
+	}
+
+	if achievement.StudentID != userID {
+		return errors.New("you can only access your own achievements")
+	}
+
+	return nil
 }
