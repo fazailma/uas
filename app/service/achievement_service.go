@@ -355,3 +355,27 @@ func (s *AchievementService) ValidateAchievementOwnership(id, userID string) err
 
 	return nil
 }
+
+// VerifyAchievementWithRoleCheck verifies achievement with role validation
+func (s *AchievementService) VerifyAchievementWithRoleCheck(achievementID, dosenID, role string) error {
+	if role != "Dosen Wali" {
+		return errors.New("only dosen wali can verify achievements")
+	}
+	return s.VerifyAchievement(achievementID, dosenID)
+}
+
+// RejectAchievementWithRoleCheck rejects achievement with role validation
+func (s *AchievementService) RejectAchievementWithRoleCheck(achievementID, rejectionNote, role string) error {
+	if role != "Dosen Wali" {
+		return errors.New("only dosen wali can reject achievements")
+	}
+	return s.RejectAchievement(achievementID, rejectionNote)
+}
+
+// UploadAttachmentWithRoleCheck uploads attachment with role validation
+func (s *AchievementService) UploadAttachmentWithRoleCheck(achievementID, userID, role string) error {
+	if role != "Mahasiswa" {
+		return errors.New("only mahasiswa can upload attachments")
+	}
+	return s.ValidateAchievementOwnership(achievementID, userID)
+}

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-
 	"UAS/app/repository"
 )
 
@@ -24,118 +22,9 @@ func NewVerificationService() *VerificationService {
 	}
 }
 
-// FR-006: View Prestasi Mahasiswa Bimbingan
-// ListGuidedStudentsAchievementsHandler handles getting achievements of guided students
-// GET /api/v1/verifications/achievements
-func (s *VerificationService) ListGuidedStudentsAchievementsHandler(c *fiber.Ctx) error {
-	dosenID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	// Only Dosen Wali can view their guided students' achievements
-	if role != "Dosen Wali" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only dosen wali can access this endpoint",
-		})
-	}
-
-	achievements, err := s.GetGuidedStudentsAchievements(dosenID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "success",
-		"data":   achievements,
-	})
-}
-
-// FR-007: Verify Prestasi
-// VerifyAchievementHandler handles verifying achievement
-// POST /api/v1/verifications/achievements/:id/verify
-func (s *VerificationService) VerifyAchievementHandler(c *fiber.Ctx) error {
-	achievementID := c.Params("id")
-	dosenID := c.Locals("user_id").(string)
-	role := c.Locals("role").(string)
-
-	// Only Dosen Wali can verify
-	if role != "Dosen Wali" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only dosen wali can verify achievements",
-		})
-	}
-
-	err := s.VerifyAchievement(achievementID, dosenID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil diverifikasi",
-		"data": fiber.Map{
-			"id":     achievementID,
-			"status": "verified",
-		},
-	})
-}
-
-// FR-008: Reject Prestasi
-// RejectAchievementHandler handles rejecting achievement
-// POST /api/v1/verifications/achievements/:id/reject
-func (s *VerificationService) RejectAchievementHandler(c *fiber.Ctx) error {
-	achievementID := c.Params("id")
-	role := c.Locals("role").(string)
-
-	// Only Dosen Wali can reject
-	if role != "Dosen Wali" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"status": "error",
-			"error":  "only dosen wali can reject achievements",
-		})
-	}
-
-	var req struct {
-		RejectionNote string `json:"rejection_note" binding:"required"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  "invalid request body",
-		})
-	}
-
-	err := s.RejectAchievement(achievementID, req.RejectionNote)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status": "error",
-			"error":  err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Prestasi berhasil ditolak",
-		"data": fiber.Map{
-			"id":     achievementID,
-			"status": "rejected",
-		},
-	})
-}
-
-// Business Logic Methods
-
 // GetGuidedStudentsAchievements gets all achievements from students guided by this lecturer
 // FR-006: View Prestasi Mahasiswa Bimbingan
-func (s *VerificationService) GetGuidedStudentsAchievements(dosenID string) ([]fiber.Map, error) {
+func (s *VerificationService) GetGuidedStudentsAchievements(dosenID string) ([]map[string]interface{}, error) {
 	// Step 1: Find lecturer by user ID
 	lecturer, err := repository.NewLecturerRepository().FindByUserID(dosenID)
 	if err != nil {
@@ -149,7 +38,7 @@ func (s *VerificationService) GetGuidedStudentsAchievements(dosenID string) ([]f
 	}
 
 	if len(students) == 0 {
-		return []fiber.Map{}, nil
+		return []map[string]interface{}{}, nil
 	}
 
 	// Step 3: Get student IDs
@@ -168,7 +57,7 @@ func (s *VerificationService) GetGuidedStudentsAchievements(dosenID string) ([]f
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var result []fiber.Map
+	var result []map[string]interface{}
 	for _, ach := range achievements {
 		// Fetch MongoDB document
 		mongoAch, err := s.mongoRepo.FindByID(ctx, ach.MongoAchievementID)
@@ -176,7 +65,7 @@ func (s *VerificationService) GetGuidedStudentsAchievements(dosenID string) ([]f
 			continue // Skip if MongoDB document not found
 		}
 
-		result = append(result, fiber.Map{
+		result = append(result, map[string]interface{}{
 			"id":             ach.ID,
 			"student_id":     ach.StudentID,
 			"title":          mongoAch.Title,
@@ -259,4 +148,28 @@ func (s *VerificationService) RejectAchievement(achievementID, rejectionNote str
 	// TODO: Create notification for student with rejection reason
 
 	return nil
+}
+
+// GetGuidedStudentsAchievementsWithRoleCheck gets achievements with role validation
+func (s *VerificationService) GetGuidedStudentsAchievementsWithRoleCheck(dosenID, role string) ([]map[string]interface{}, error) {
+	if role != "Dosen Wali" {
+		return nil, errors.New("only dosen wali can access this endpoint")
+	}
+	return s.GetGuidedStudentsAchievements(dosenID)
+}
+
+// VerifyAchievementWithRoleCheck verifies achievement with role validation
+func (s *VerificationService) VerifyAchievementWithRoleCheck(achievementID, dosenID, role string) error {
+	if role != "Dosen Wali" {
+		return errors.New("only dosen wali can verify achievements")
+	}
+	return s.VerifyAchievement(achievementID, dosenID)
+}
+
+// RejectAchievementWithRoleCheck rejects achievement with role validation
+func (s *VerificationService) RejectAchievementWithRoleCheck(achievementID, rejectionNote, role string) error {
+	if role != "Dosen Wali" {
+		return errors.New("only dosen wali can reject achievements")
+	}
+	return s.RejectAchievement(achievementID, rejectionNote)
 }
