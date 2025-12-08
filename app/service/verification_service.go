@@ -5,7 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+
 	"UAS/app/repository"
+	"UAS/helpers"
 )
 
 type VerificationService struct {
@@ -172,4 +175,37 @@ func (s *VerificationService) RejectAchievementWithRoleCheck(achievementID, reje
 		return errors.New("only dosen wali can reject achievements")
 	}
 	return s.RejectAchievement(achievementID, rejectionNote)
+}
+
+// ===== HTTP Handlers =====
+
+// GetAchievementsHandler returns achievements for guided students
+func (s *VerificationService) GetAchievementsHandler(c *fiber.Ctx) error {
+	achievements, err := s.GetGuidedStudentsAchievementsWithRoleCheck(c.Locals("user_id").(string), c.Locals("role").(string))
+	if err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(helpers.BuildErrorResponse(403, err.Error()))
+	}
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildSuccessResponse(200, achievements))
+}
+
+// VerifyAchievementHandler verifies an achievement
+func (s *VerificationService) VerifyAchievementHandler(c *fiber.Ctx) error {
+	if err := s.VerifyAchievementWithRoleCheck(c.Params("id"), c.Locals("user_id").(string), c.Locals("role").(string)); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, err.Error()))
+	}
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("Prestasi berhasil diverifikasi", fiber.Map{"id": c.Params("id"), "status": "verified"}))
+}
+
+// RejectAchievementHandler rejects an achievement
+func (s *VerificationService) RejectAchievementHandler(c *fiber.Ctx) error {
+	var req struct {
+		RejectionNote string `json:"rejection_note"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
+	}
+	if err := s.RejectAchievementWithRoleCheck(c.Params("id"), req.RejectionNote, c.Locals("role").(string)); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, err.Error()))
+	}
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("Prestasi berhasil ditolak", fiber.Map{"id": c.Params("id"), "status": "rejected"}))
 }

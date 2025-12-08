@@ -14,4 +14,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Setup verification routes (for dosen wali)
 	SetupVerificationRoutes(app)
+
+	// Setup admin routes
+	SetupAdminRoutes(app)
 }

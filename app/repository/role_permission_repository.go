@@ -38,6 +38,26 @@ func (r *RoleRepository) Create(role *models.Role) error {
 	return database.DB.Create(role).Error
 }
 
+// Update updates a role
+func (r *RoleRepository) Update(role *models.Role) error {
+	return database.DB.Save(role).Error
+}
+
+// FindAll retrieves all roles
+func (r *RoleRepository) FindAll() ([]*models.Role, error) {
+	var roles []*models.Role
+	err := database.DB.Find(&roles).Error
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
+}
+
+// Delete deletes a role
+func (r *RoleRepository) Delete(id string) error {
+	return database.DB.Where("id = ?", id).Delete(&models.Role{}).Error
+}
+
 // PermissionRepository handles permission database operations
 type PermissionRepository struct{}
 

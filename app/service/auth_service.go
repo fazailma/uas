@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"UAS/app/models"
 	"UAS/app/repository"
 	"UAS/database"
+	"UAS/helpers"
 	"UAS/utils"
 
 	"gorm.io/gorm"
@@ -31,8 +33,8 @@ func NewAuthService(userRepo *repository.UserRepository) *AuthService {
 	}
 }
 
-// Login authenticates user and returns JWT token with new format
-func (s *AuthService) Login(loginReq *models.LoginCredential) (*models.LoginResponse, error) {
+// login authenticates user and returns JWT token with new format
+func (s *AuthService) login(loginReq *models.LoginCredential) (*models.LoginResponse, error) {
 	// Validate input
 	if loginReq.Username == "" {
 		return nil, errors.New("username is required")
@@ -116,7 +118,8 @@ func (s *AuthService) Login(loginReq *models.LoginCredential) (*models.LoginResp
 }
 
 // Register creates a new user and returns user ID
-func (s *AuthService) Register(reg *models.RegisterRequest) (string, error) {
+// register handles user registration
+func (s *AuthService) register(reg *models.RegisterRequest) (string, error) {
 	// Validate input
 	if reg.Username == "" {
 		return "", errors.New("username is required")
@@ -256,4 +259,62 @@ func assignAdvisor() string {
 	}
 
 	return selectedLecturer.ID
+}
+
+// ===== HTTP Handlers =====
+
+// Login handles login request
+func (s *AuthService) Login(c *fiber.Ctx) error {
+	var req models.LoginCredential
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
+	}
+	response, err := s.login(&req)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.BuildErrorResponse(401, err.Error()))
+	}
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildSuccessResponse(200, response))
+}
+
+// Register handles registration request
+func (s *AuthService) Register(c *fiber.Ctx) error {
+	var req models.RegisterRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
+	}
+	userID, err := s.register(&req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, err.Error()))
+	}
+	return c.Status(fiber.StatusCreated).JSON(helpers.BuildCreatedResponse("user registered successfully", fiber.Map{"user_id": userID}))
+}
+
+// Logout handles logout request
+func (s *AuthService) Logout(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("logout successful", nil))
+}
+
+// RefreshToken handles token refresh request
+func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
+	}
+	if req.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "token is required"))
+	}
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("token refreshed", fiber.Map{"token": "new-token-here"}))
+}
+
+// GetProfile returns user profile
+func (s *AuthService) GetProfile(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusOK).JSON(helpers.BuildSuccessResponse(200, fiber.Map{
+		"user_id":     c.Locals("user_id"),
+		"username":    c.Locals("username"),
+		"email":       c.Locals("email"),
+		"role":        c.Locals("role"),
+		"permissions": c.Locals("permissions"),
+	}))
 }

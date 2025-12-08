@@ -78,3 +78,28 @@ func (r *UserRepository) Create(user *models.User) error {
 	}
 	return database.DB.Create(user).Error
 }
+
+// Update updates a user record
+func (r *UserRepository) Update(user *models.User) error {
+	return database.DB.Save(user).Error
+}
+
+// FindAll retrieves all users with pagination
+func (r *UserRepository) FindAll(page, pageSize int) ([]*models.User, int64, error) {
+	var users []*models.User
+	var total int64
+
+	query := database.DB.Where("is_active = ?", true)
+
+	if err := query.Model(&models.User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	err := query.Offset(offset).Limit(pageSize).Find(&users).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
