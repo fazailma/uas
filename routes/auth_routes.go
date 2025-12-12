@@ -8,11 +8,10 @@ import (
 )
 
 func SetupAuthRoutes(app *fiber.App) {
-	svc := service.NewAuthService(nil)
+	svc := service.NewAuthService()
 	g := app.Group("/api/v1/auth")
 
 	g.Post("/login", svc.Login)
-	g.Post("/register", svc.Register)
 	g.Post("/logout", svc.Logout)
 	g.Post("/refresh", svc.RefreshToken)
 

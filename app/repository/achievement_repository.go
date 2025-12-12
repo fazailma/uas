@@ -114,3 +114,53 @@ func (r *AchievementRepository) RejectAchievement(id string, rejectionNote strin
 			"rejection_note": rejectionNote,
 		}).Error
 }
+
+// CountByStatus returns count of achievements grouped by status
+func (r *AchievementRepository) CountByStatus() (map[string]int64, error) {
+	var results []struct {
+		Status string
+		Count  int64
+	}
+
+	err := database.DB.Model(&models.AchievementReference{}).
+		Select("status, count(*) as count").
+		Group("status").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make(map[string]int64)
+	for _, r := range results {
+		counts[r.Status] = r.Count
+	}
+
+	return counts, nil
+}
+
+// CountTotal returns total count of achievements
+func (r *AchievementRepository) CountTotal() (int64, error) {
+	var total int64
+	err := database.DB.Model(&models.AchievementReference{}).Count(&total).Error
+	return total, err
+}
+
+// FindAllWithPagination finds all achievements with pagination
+func (r *AchievementRepository) FindAllWithPagination(page, pageSize int) ([]models.AchievementReference, int64, error) {
+	var achievements []models.AchievementReference
+	var total int64
+
+	offset := (page - 1) * pageSize
+
+	if err := database.DB.Model(&models.AchievementReference{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := database.DB.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&achievements).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return achievements, total, nil
+}

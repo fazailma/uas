@@ -43,3 +43,21 @@ type AchievementDetailResponse struct {
 	StudentID   string `json:"student_id"`
 	CreatedAt   string `json:"created_at"`
 }
+
+// CreateAchievementRequest represents request to create achievement
+type CreateAchievementRequest struct {
+	Title       string `json:"title" validate:"required"`
+	Description string `json:"description"`
+	Category    string `json:"category" validate:"required"`
+	Date        string `json:"date" validate:"required"`
+	ProofURL    string `json:"proof_url"`
+}
+
+// UpdateAchievementRequest represents request to update achievement
+type UpdateAchievementRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Date        string `json:"date"`
+	ProofURL    string `json:"proof_url"`
+}

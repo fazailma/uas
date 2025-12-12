@@ -12,9 +12,15 @@ func SetupRoutes(app *fiber.App) {
 	// Setup achievement routes
 	SetupAchievementRoutes(app)
 
-	// Setup verification routes (for dosen wali)
-	SetupVerificationRoutes(app)
+	// Setup user management routes
+	SetupUserRoutes(app)
 
-	// Setup admin routes
-	SetupAdminRoutes(app)
+	// Setup student routes
+	SetupStudentRoutes(app)
+
+	// Setup lecturer routes
+	SetupLecturerRoutes(app)
+
+	// Setup report and analytics routes
+	SetupReportRoutes(app)
 }

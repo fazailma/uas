@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+
 	"UAS/app/models"
 	"UAS/database"
 )
@@ -56,4 +58,23 @@ func (r *StudentRepository) FindByAdvisorID(advisorID string) ([]models.Student,
 		return nil, err
 	}
 	return students, nil
+}
+
+// CountByYear counts students with student_id starting with year
+func (r *StudentRepository) CountByYear(year int) (int64, error) {
+	var count int64
+	yearStr := fmt.Sprintf("%d%%", year)
+	err := database.DB.Model(&models.Student{}).
+		Where("student_id LIKE ?", yearStr).
+		Count(&count).Error
+	return count, err
+}
+
+// CountByAdvisorID counts students assigned to an advisor
+func (r *StudentRepository) CountByAdvisorID(advisorID string) (int64, error) {
+	var count int64
+	err := database.DB.Model(&models.Student{}).
+		Where("advisor_id = ?", advisorID).
+		Count(&count).Error
+	return count, err
 }

@@ -47,3 +47,17 @@ func (r *LecturerRepository) Update(id string, lecturer *models.Lecturer) error 
 func (r *LecturerRepository) Delete(id string) error {
 	return database.DB.Where("id = ?", id).Delete(&models.Lecturer{}).Error
 }
+
+// FindAll finds all lecturers
+func (r *LecturerRepository) FindAll() ([]models.Lecturer, error) {
+	var lecturers []models.Lecturer
+	err := database.DB.Find(&lecturers).Error
+	return lecturers, err
+}
+
+// CountTotal counts total lecturers
+func (r *LecturerRepository) CountTotal() (int64, error) {
+	var count int64
+	err := database.DB.Model(&models.Lecturer{}).Count(&count).Error
+	return count, err
+}

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,74 +10,73 @@ import (
 	"UAS/app/models"
 	"UAS/app/repository"
 	"UAS/database"
-	"UAS/helpers"
 	"UAS/utils"
-
-	"gorm.io/gorm"
 )
 
-// AuthService handles authentication business logic
-type AuthService struct {
+// AuthService defines all authentication operations
+type AuthService interface {
+	Login(c *fiber.Ctx) error
+	Register(c *fiber.Ctx) error
+	Logout(c *fiber.Ctx) error
+	RefreshToken(c *fiber.Ctx) error
+	GetProfile(c *fiber.Ctx) error
+}
+
+type authServiceImpl struct {
 	userRepo     *repository.UserRepository
 	studentRepo  *repository.StudentRepository
 	lecturerRepo *repository.LecturerRepository
 }
 
-// NewAuthService creates a new instance of AuthService
-func NewAuthService(userRepo *repository.UserRepository) *AuthService {
-	return &AuthService{
-		userRepo:     userRepo,
+func NewAuthService() AuthService {
+	return &authServiceImpl{
+		userRepo:     repository.NewUserRepository(),
 		studentRepo:  repository.NewStudentRepository(),
 		lecturerRepo: repository.NewLecturerRepository(),
 	}
 }
 
-// login authenticates user and returns JWT token with new format
-func (s *AuthService) login(loginReq *models.LoginCredential) (*models.LoginResponse, error) {
-	// Validate input
-	if loginReq.Username == "" {
-		return nil, errors.New("username is required")
-	}
-	if loginReq.Password == "" {
-		return nil, errors.New("password is required")
-	}
-
-	// Find user by username
-	user, err := s.userRepo.FindByUsername(loginReq.Username)
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("invalid credentials")
-		}
-		return nil, err
+// Login handles user authentication
+// @Summary User login
+// @Description Authenticate user and return JWT token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body models.LoginCredential true \"Login credentials\"
+// @Success 200 {object} fiber.Map \"token and user data\"
+// @Failure 401 {object} map[string]string
+// @Router /auth/login [post]
+func (s *authServiceImpl) Login(c *fiber.Ctx) error {
+	var req models.LoginCredential
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
-	// Check if user is active
-	if !user.IsActive {
-		return nil, errors.New("user is inactive")
+	if req.Username == "" || req.Password == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "username and password are required")
 	}
 
-	// Verify password
-	if !utils.VerifyPassword(loginReq.Password, user.PasswordHash) {
-		return nil, errors.New("invalid credentials")
+	user, err := s.userRepo.FindByUsername(req.Username)
+	if err != nil || !user.IsActive {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid credentials")
 	}
 
-	// Get user with role and permissions
+	if !utils.VerifyPassword(req.Password, user.PasswordHash) {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid credentials")
+	}
+
 	userWithPerms, permissions, err := s.userRepo.GetUserWithRoleAndPermissions(user.ID)
 	if err != nil {
-		return nil, err
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user permissions")
 	}
 
-	// Get role - guard against empty RoleID to avoid UUID errors
 	var role models.Role
 	if userWithPerms.RoleID != "" {
 		if err := database.DB.Where("id = ?", userWithPerms.RoleID).First(&role).Error; err != nil {
-			// Log but don't fail if role not found
 			role.Name = ""
 		}
 	}
 
-	// Generate JWT token
 	permissionNames := make([]string, len(permissions))
 	for i, p := range permissions {
 		permissionNames[i] = p.Name
@@ -86,172 +84,166 @@ func (s *AuthService) login(loginReq *models.LoginCredential) (*models.LoginResp
 
 	token, err := utils.GenerateJWT(userWithPerms, role, permissionNames)
 	if err != nil {
-		return nil, err
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token")
 	}
 
-	// Generate refresh token
 	refreshToken, err := utils.GenerateRefreshToken(userWithPerms)
 	if err != nil {
-		return nil, err
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate refresh token")
 	}
 
-	// Build user profile
-	userProfile := models.UserProfile{
-		ID:          userWithPerms.ID,
-		Username:    userWithPerms.Username,
-		FullName:    userWithPerms.FullName,
-		Role:        role.Name,
-		Permissions: permissionNames,
-	}
-
-	// Build response in new format
 	response := &models.LoginResponse{
 		Status: "success",
 		Data: models.LoginResponseData{
 			Token:        token,
 			RefreshToken: refreshToken,
-			User:         userProfile,
+			User: models.UserProfile{
+				ID:          userWithPerms.ID,
+				Username:    userWithPerms.Username,
+				FullName:    userWithPerms.FullName,
+				Role:        role.Name,
+				Permissions: permissionNames,
+			},
 		},
 	}
 
-	return response, nil
+	return utils.SuccessResponse(c, "login successful", response)
 }
 
-// Register creates a new user and returns user ID
-// register handles user registration
-func (s *AuthService) register(reg *models.RegisterRequest) (string, error) {
-	// Validate input
-	if reg.Username == "" {
-		return "", errors.New("username is required")
-	}
-	if reg.Password == "" {
-		return "", errors.New("password is required")
+// Register handler
+func (s *authServiceImpl) Register(c *fiber.Ctx) error {
+	var req models.RegisterRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
-	// Check uniqueness
-	if _, err := s.userRepo.FindByUsername(reg.Username); err == nil {
-		return "", errors.New("username already exists")
+	if req.Username == "" || req.Password == "" || req.Email == "" || req.FullName == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "username, password, email, and full_name are required")
 	}
 
-	// Hash password
-	hashed := utils.HashPassword(reg.Password)
+	if _, err := s.userRepo.FindByUsername(req.Username); err == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "username already exists")
+	}
 
-	// Create user model
 	user := &models.User{
 		ID:           uuid.New().String(),
-		Username:     reg.Username,
-		Email:        reg.Email,
-		PasswordHash: hashed,
-		FullName:     reg.FullName,
-		RoleID:       reg.RoleID,
+		Username:     req.Username,
+		Email:        req.Email,
+		PasswordHash: utils.HashPassword(req.Password),
+		FullName:     req.FullName,
+		RoleID:       req.RoleID,
 		IsActive:     true,
 	}
 
-	// Save user
 	if err := s.userRepo.Create(user); err != nil {
-		return "", err
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to register user")
 	}
 
-	// Auto-create Student or Lecturer profile based on role
-	// Get role dari RoleID
 	var role models.Role
 	if err := database.DB.Where("id = ?", user.RoleID).First(&role).Error; err != nil {
-		// Role tidak ditemukan, tapi user sudah dibuat, jadi return user.ID saja
-		return user.ID, nil
+		return utils.CreatedResponse(c, "user registered successfully", fiber.Map{"user_id": user.ID})
 	}
 
-	// Jika role adalah "Mahasiswa", buat Student record
 	if role.Name == "Mahasiswa" {
-		// Generate StudentID (NIM) format: TAHUN + NOMOR (e.g., 2025001)
-		studentID := generateStudentID()
+		studentID := s.generateStudentID()
+		advisorID := s.assignAdvisor()
 
-		// Auto-assign advisor dengan load-balancing
-		advisorID := assignAdvisor()
-
-		student := &models.Student{
+		if err := s.studentRepo.Create(&models.Student{
 			ID:           uuid.New().String(),
 			UserID:       user.ID,
 			StudentID:    studentID,
 			ProgramStudy: "",
 			AcademicYear: "",
 			AdvisorID:    advisorID,
-		}
-		if err := s.studentRepo.Create(student); err != nil {
+		}); err != nil {
 			// Log error tapi jangan gagalkan registration
 		}
 	}
 
-	// Jika role adalah "Dosen Wali", buat Lecturer record
 	if role.Name == "Dosen Wali" {
-		// Generate LecturerID (NIP) format: NOMOR (e.g., 001 + timestamp)
-		lecturerID := generateLecturerID()
+		lecturerID := s.generateLecturerID()
 
-		lecturer := &models.Lecturer{
+		if err := s.lecturerRepo.Create(&models.Lecturer{
 			ID:         uuid.New().String(),
 			UserID:     user.ID,
 			LecturerID: lecturerID,
 			Department: "",
-		}
-		if err := s.lecturerRepo.Create(lecturer); err != nil {
+		}); err != nil {
 			// Log error tapi jangan gagalkan registration
 		}
 	}
 
-	return user.ID, nil
+	return utils.CreatedResponse(c, "user registered successfully", fiber.Map{"user_id": user.ID})
 }
 
-// generateStudentID generates a unique Student ID (NIM)
-// Format: YEAR + SEQUENTIAL NUMBER (e.g., 20250001)
-func generateStudentID() string {
+// Logout handler
+func (s *authServiceImpl) Logout(c *fiber.Ctx) error {
+	return utils.SuccessResponse(c, "logout successful", nil)
+}
+
+// RefreshToken handler
+func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Token == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "token is required")
+	}
+
+	return utils.SuccessResponse(c, "token refreshed", fiber.Map{"token": "new-token-here"})
+}
+
+// GetProfile handler
+func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
+	return utils.SuccessResponse(c, "profile retrieved", fiber.Map{
+		"user_id":     c.Locals("user_id"),
+		"username":    c.Locals("username"),
+		"email":       c.Locals("email"),
+		"role":        c.Locals("role"),
+		"permissions": c.Locals("permissions"),
+	})
+}
+
+// generateStudentID generates a unique Student ID
+func (s *authServiceImpl) generateStudentID() string {
 	year := time.Now().Year()
-
-	// Count existing students untuk tahun ini
-	var count int64
-	database.DB.Model(&models.Student{}).
-		Where("student_id LIKE ?", fmt.Sprintf("%d%%", year)).
-		Count(&count)
-
-	// Generate: YEAR + PAD NUMBER (e.g., 20250001)
+	count, err := s.studentRepo.CountByYear(year)
+	if err != nil {
+		count = 0
+	}
 	return fmt.Sprintf("%d%04d", year, count+1)
 }
 
-// generateLecturerID generates a unique Lecturer ID (NIP)
-// Format: SEQUENTIAL NUMBER + TIMESTAMP (e.g., 001-1700000000)
-func generateLecturerID() string {
-	// Count existing lecturers
-	var count int64
-	database.DB.Model(&models.Lecturer{}).Count(&count)
-
-	// Generate: PAD NUMBER + TIMESTAMP (e.g., 001-1700000000)
+// generateLecturerID generates a unique Lecturer ID
+func (s *authServiceImpl) generateLecturerID() string {
+	count, err := s.lecturerRepo.CountTotal()
+	if err != nil {
+		count = 0
+	}
 	timestamp := time.Now().Unix()
 	return fmt.Sprintf("%03d-%d", count+1, timestamp)
 }
 
-// assignAdvisor assigns a student to a lecturer with load-balancing
-// Selects the lecturer with the fewest students
-// If no lecturers exist, returns empty string
-func assignAdvisor() string {
-	// Get all lecturers
-	var lecturers []models.Lecturer
-	if err := database.DB.Find(&lecturers).Error; err != nil {
-		return "" // Return empty if query fails
+// assignAdvisor assigns student to lecturer with load-balancing
+func (s *authServiceImpl) assignAdvisor() string {
+	lecturers, err := s.lecturerRepo.FindAll()
+	if err != nil || len(lecturers) == 0 {
+		return ""
 	}
 
-	if len(lecturers) == 0 {
-		return "" // No lecturers available
-	}
-
-	// For each lecturer, count how many students they advise
 	var selectedLecturer models.Lecturer
-	var minStudentCount int64 = 999999 // Large number to start
+	var minStudentCount int64 = 999999
 
 	for _, lecturer := range lecturers {
-		var count int64
-		database.DB.Model(&models.Student{}).
-			Where("advisor_id = ?", lecturer.ID).
-			Count(&count)
+		count, err := s.studentRepo.CountByAdvisorID(lecturer.ID)
+		if err != nil {
+			continue
+		}
 
-		// Select lecturer with fewest students
 		if count < minStudentCount {
 			minStudentCount = count
 			selectedLecturer = lecturer
@@ -259,62 +251,4 @@ func assignAdvisor() string {
 	}
 
 	return selectedLecturer.ID
-}
-
-// ===== HTTP Handlers =====
-
-// Login handles login request
-func (s *AuthService) Login(c *fiber.Ctx) error {
-	var req models.LoginCredential
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
-	}
-	response, err := s.login(&req)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(helpers.BuildErrorResponse(401, err.Error()))
-	}
-	return c.Status(fiber.StatusOK).JSON(helpers.BuildSuccessResponse(200, response))
-}
-
-// Register handles registration request
-func (s *AuthService) Register(c *fiber.Ctx) error {
-	var req models.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
-	}
-	userID, err := s.register(&req)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, err.Error()))
-	}
-	return c.Status(fiber.StatusCreated).JSON(helpers.BuildCreatedResponse("user registered successfully", fiber.Map{"user_id": userID}))
-}
-
-// Logout handles logout request
-func (s *AuthService) Logout(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("logout successful", nil))
-}
-
-// RefreshToken handles token refresh request
-func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
-	var req struct {
-		Token string `json:"token"`
-	}
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "invalid request body"))
-	}
-	if req.Token == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(helpers.BuildErrorResponse(400, "token is required"))
-	}
-	return c.Status(fiber.StatusOK).JSON(helpers.BuildOKResponse("token refreshed", fiber.Map{"token": "new-token-here"}))
-}
-
-// GetProfile returns user profile
-func (s *AuthService) GetProfile(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON(helpers.BuildSuccessResponse(200, fiber.Map{
-		"user_id":     c.Locals("user_id"),
-		"username":    c.Locals("username"),
-		"email":       c.Locals("email"),
-		"role":        c.Locals("role"),
-		"permissions": c.Locals("permissions"),
-	}))
 }
