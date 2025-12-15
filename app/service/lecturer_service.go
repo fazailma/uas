@@ -49,8 +49,8 @@ func NewLecturerService() LecturerService {
 // @Produce json
 // @Param body body models.Lecturer true "Lecturer data"
 // @Success 201 {object} models.Lecturer
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /lecturers [post]
 // @Security Bearer
 func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
@@ -114,8 +114,8 @@ func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
 // @Param id path string true "Lecturer ID"
 // @Param body body models.Lecturer true "Lecturer data"
 // @Success 200 {object} models.Lecturer
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /lecturers/{id} [put]
 // @Security Bearer
 func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
@@ -152,10 +152,10 @@ func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
 // @Description Verify a submitted achievement (Dosen Wali only)
 // @Tags Lecturer
 // @Produce json
-// @Param id path string true \"Achievement ID\"
-// @Success 200 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} models.MessageResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /lecturer/achievements/{id}/verify [post]
 // @Security Bearer
 func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
@@ -202,11 +202,11 @@ func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Tags Lecturer
 // @Accept json
 // @Produce json
-// @Param id path string true \"Achievement ID\"
-// @Param body body map[string]string true \"Rejection note\"
-// @Success 200 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Param id path string true "Achievement ID"
+// @Param body body models.MessageResponse true "Rejection note"
+// @Success 200 {object} models.MessageResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /lecturer/achievements/{id}/reject [post]
 // @Security Bearer
 func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
@@ -245,8 +245,8 @@ func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // @Tags Lecturer
 // @Produce json
 // @Success 200 {array} models.AchievementReference
-// @Failure 403 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /lecturer/achievements [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error {
@@ -317,8 +317,8 @@ func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error 
 // @Description Get paginated list of all lecturers
 // @Tags Lecturers
 // @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.LecturerListResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /lecturers [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) ListLecturers(c *fiber.Ctx) error {
@@ -338,9 +338,9 @@ func (s *lecturerServiceImpl) ListLecturers(c *fiber.Ctx) error {
 // @Tags Lecturers
 // @Produce json
 // @Param id path string true "Lecturer ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.StudentListResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /lecturers/{id}/advisees [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) GetAdvisees(c *fiber.Ctx) error {

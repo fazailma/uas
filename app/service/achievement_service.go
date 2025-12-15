@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -23,6 +24,7 @@ type AchievementService interface {
 	GetAchievementDetail(c *fiber.Ctx) error
 	GetAchievementHistory(c *fiber.Ctx) error
 	GetStatistics(c *fiber.Ctx) error
+	GetStudentReport(c *fiber.Ctx) error
 	VerifyAchievement(c *fiber.Ctx) error
 	RejectAchievement(c *fiber.Ctx) error
 	UploadAttachment(c *fiber.Ctx) error
@@ -52,8 +54,8 @@ func NewAchievementService() AchievementService {
 // @Produce json
 // @Param body body models.CreateAchievementRequest true "Achievement data"
 // @Success 201 {object} models.AchievementReference
-// @Failure 400 {object} map[string]string
-// @Failure 403 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
 // @Router /achievements [post]
 // @Security Bearer
 func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
@@ -111,30 +113,180 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Success 200 {array} models.AchievementReference
-// @Failure 500 {object} map[string]string
+// @Failure 500 {object} models.ErrorResponse
 // @Router /achievements [get]
 // @Security Bearer
 func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	role := c.Locals("role").(string)
 
+	// Get query parameters for filtering, sorting, and pagination
+	status := c.Query("status", "")            // draft, submitted, verified, rejected
+	achievementType := c.Query("type", "")     // competition, publication, organization, certification
+	sortBy := c.Query("sort_by", "created_at") // created_at, updated_at, title
+	sortOrder := c.Query("sort_order", "desc") // asc, desc
+	page := c.QueryInt("page", 1)
+	pageSize := c.QueryInt("page_size", 10)
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
 	var achievements []models.AchievementReference
 	var err error
 
 	switch role {
 	case "Admin":
+		// Admin can see all achievements
 		achievements, err = s.pgRepo.FindAll()
+
 	case "Mahasiswa":
+		// Student can only see their own achievements
 		achievements, err = s.pgRepo.FindByStudentID(userID)
+
+	case "Dosen", "Dosen Wali":
+		// Lecturer can only see achievements from their advisees (anak wali)
+		// First, get all students where AdvisorID = current user
+		students, err := s.studentRepo.FindByAdvisorID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve advisees")
+		}
+
+		// Then get achievements for all advisees
+		achievements = []models.AchievementReference{}
+		for _, student := range students {
+			studentAchievements, err := s.pgRepo.FindByStudentID(student.UserID)
+			if err != nil {
+				continue // Skip if error
+			}
+			achievements = append(achievements, studentAchievements...)
+		}
+
 	default:
-		achievements, err = s.pgRepo.FindAll()
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions to view achievements")
 	}
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve achievements")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve achievements: "+err.Error())
 	}
 
-	return utils.SuccessResponse(c, "achievements retrieved successfully", achievements)
+	// Debug: log jumlah achievements
+	// fmt.Printf("DEBUG - Role: %s, Total achievements found: %d\n", role, len(achievements))
+
+	// If no achievements found, return empty response with message
+	if len(achievements) == 0 {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"status":  true,
+			"message": "no achievements found for user (role: " + role + ")",
+			"data":    []fiber.Map{},
+			"pagination": fiber.Map{
+				"page":        1,
+				"page_size":   pageSize,
+				"total":       0,
+				"total_pages": 0,
+			},
+		})
+	}
+
+	// Apply filters
+	var filteredAchievements []models.AchievementReference
+	for _, ach := range achievements {
+		// Filter by status
+		if status != "" && ach.Status != status {
+			continue
+		}
+		// Filter by achievement type (need to fetch from MongoDB)
+		if achievementType != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			mongoAch, err := s.mongoRepo.FindByID(ctx, ach.MongoAchievementID)
+			cancel()
+			if err != nil || mongoAch.AchievementType != achievementType {
+				continue
+			}
+		}
+		filteredAchievements = append(filteredAchievements, ach)
+	}
+
+	// Apply sorting
+	for i := 0; i < len(filteredAchievements)-1; i++ {
+		for j := 0; j < len(filteredAchievements)-1-i; j++ {
+			shouldSwap := false
+			if sortOrder == "asc" {
+				if sortBy == "title" {
+					shouldSwap = filteredAchievements[j].Status > filteredAchievements[j+1].Status
+				} else if sortBy == "updated_at" {
+					shouldSwap = filteredAchievements[j].UpdatedAt.After(filteredAchievements[j+1].UpdatedAt)
+				} else { // default: created_at
+					shouldSwap = filteredAchievements[j].CreatedAt.After(filteredAchievements[j+1].CreatedAt)
+				}
+			} else { // desc
+				if sortBy == "title" {
+					shouldSwap = filteredAchievements[j].Status < filteredAchievements[j+1].Status
+				} else if sortBy == "updated_at" {
+					shouldSwap = filteredAchievements[j].UpdatedAt.Before(filteredAchievements[j+1].UpdatedAt)
+				} else { // default: created_at
+					shouldSwap = filteredAchievements[j].CreatedAt.Before(filteredAchievements[j+1].CreatedAt)
+				}
+			}
+			if shouldSwap {
+				filteredAchievements[j], filteredAchievements[j+1] = filteredAchievements[j+1], filteredAchievements[j]
+			}
+		}
+	}
+
+	// Apply pagination
+	totalRecords := len(filteredAchievements)
+	totalPages := (totalRecords + pageSize - 1) / pageSize
+	startIdx := (page - 1) * pageSize
+	endIdx := startIdx + pageSize
+
+	if startIdx >= totalRecords {
+		startIdx = totalRecords
+	}
+	if endIdx > totalRecords {
+		endIdx = totalRecords
+	}
+
+	paginatedAchievements := filteredAchievements[startIdx:endIdx]
+
+	// Fetch MongoDB details for each achievement
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	response := fiber.Map{
+		"data": []fiber.Map{},
+		"pagination": fiber.Map{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       totalRecords,
+			"total_pages": totalPages,
+		},
+	}
+
+	responseData := make([]fiber.Map, len(paginatedAchievements))
+	for i, ach := range paginatedAchievements {
+		mongoAch, err := s.mongoRepo.FindByID(ctx, ach.MongoAchievementID)
+		if err != nil {
+			mongoAch = nil // If not found, just continue
+		}
+
+		responseData[i] = fiber.Map{
+			"id":              ach.ID,
+			"student_id":      ach.StudentID,
+			"mongo_id":        ach.MongoAchievementID,
+			"status":          ach.Status,
+			"created_at":      ach.CreatedAt,
+			"updated_at":      ach.UpdatedAt,
+			"verified_at":     ach.VerifiedAt,
+			"mongodb_details": mongoAch,
+		}
+	}
+	response["data"] = responseData
+
+	return c.Status(fiber.StatusOK).JSON(response)
 }
 
 // GetAchievementDetail handles getting achievement detail
@@ -144,8 +296,8 @@ func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Achievement ID"
 // @Success 200 {object} models.AchievementReference
-// @Failure 404 {object} map[string]string
-// @Failure 403 {object} map[string]string
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
 // @Router /achievements/{id} [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
@@ -171,9 +323,9 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 // @Param id path string true "Achievement ID"
 // @Param body body models.UpdateAchievementRequest true "Updated achievement data"
 // @Success 200 {object} models.AchievementReference
-// @Failure 400 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /achievements/{id} [put]
 // @Security Bearer
 func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
@@ -224,10 +376,10 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /achievements/{id} [delete]
 // @Security Bearer
 func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
@@ -264,10 +416,10 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} fiber.Map
-// @Failure 400 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /achievements/{id}/submit [post]
 // @Security Bearer
 func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
@@ -297,9 +449,9 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} fiber.Map
-// @Failure 403 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Success 200 {object} models.SuccessResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /achievements/{id}/history [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
@@ -353,11 +505,11 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 
 // GetStatistics handles getting achievement statistics
 // @Summary Get achievement statistics
-// @Description Get statistics of achievements based on user role
+// @Description Get comprehensive statistics of achievements based on user role
 // @Tags Achievements
 // @Produce json
-// @Success 200 {object} fiber.Map
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.StatisticsResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /achievements/stats [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetStatistics(c *fiber.Ctx) error {
@@ -367,23 +519,26 @@ func (s *achievementServiceImpl) GetStatistics(c *fiber.Ctx) error {
 	var achievements []models.AchievementReference
 	var err error
 
-	if role == "Mahasiswa" {
+	switch role {
+	case "Mahasiswa":
+		// Student sees only their own
 		achievements, err = s.pgRepo.FindByStudentID(userID)
-	} else if role == "Dosen Wali" {
-		lecturerRepo := repository.NewLecturerRepository()
-		lecturer, err := lecturerRepo.FindByUserID(userID)
-		if err == nil && lecturer != nil {
-			studentRepo := repository.NewStudentRepository()
-			students, err := studentRepo.FindByAdvisorID(lecturer.ID)
-			if err == nil && len(students) > 0 {
-				var studentIDs []string
-				for _, s := range students {
-					studentIDs = append(studentIDs, s.UserID)
-				}
-				achievements, _ = s.pgRepo.FindByStudentIDs(studentIDs)
-			}
+	case "Dosen", "Dosen Wali":
+		// Lecturer sees their advisees
+		students, err := s.studentRepo.FindByAdvisorID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve advisees")
 		}
-	} else {
+		achievements = []models.AchievementReference{}
+		for _, student := range students {
+			studentAchievements, err := s.pgRepo.FindByStudentID(student.UserID)
+			if err != nil {
+				continue
+			}
+			achievements = append(achievements, studentAchievements...)
+		}
+	default:
+		// Admin sees all
 		achievements, err = s.pgRepo.FindAll()
 	}
 
@@ -391,39 +546,114 @@ func (s *achievementServiceImpl) GetStatistics(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve achievements")
 	}
 
-	stats := s.buildStatistics(achievements)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stats := s.buildStatistics(ctx, achievements)
 	return utils.SuccessResponse(c, "statistics retrieved successfully", stats)
 }
 
-// buildStatistics builds statistics from achievements
-func (s *achievementServiceImpl) buildStatistics(achievements []models.AchievementReference) fiber.Map {
-	var verified, pending, rejected, draft int64
-	for i := range achievements {
-		switch achievements[i].Status {
-		case "verified":
-			verified++
-		case "submitted":
-			pending++
-		case "rejected":
-			rejected++
-		case "draft":
-			draft++
+// buildStatistics builds comprehensive statistics from achievements
+func (s *achievementServiceImpl) buildStatistics(ctx context.Context, achievements []models.AchievementReference) fiber.Map {
+	// 1. Status distribution
+	statusCount := map[string]int64{
+		"draft":     0,
+		"submitted": 0,
+		"verified":  0,
+		"rejected":  0,
+	}
+	for _, ach := range achievements {
+		statusCount[ach.Status]++
+	}
+
+	// 2. Achievement type distribution
+	typeCount := map[string]int64{
+		"competition":   0,
+		"publication":   0,
+		"organization":  0,
+		"certification": 0,
+	}
+
+	// 3. Competition level distribution
+	levelCount := map[string]int64{
+		"school":        0,
+		"city":          0,
+		"provincial":    0,
+		"national":      0,
+		"international": 0,
+	}
+
+	// 4. Period distribution (by year)
+	periodCount := make(map[string]int64)
+
+	// 5. Student with most achievements
+	studentAchievementCount := make(map[string]int64)
+
+	for _, ach := range achievements {
+		// Get MongoDB details for type and level
+		mongoAch, err := s.mongoRepo.FindByID(ctx, ach.MongoAchievementID)
+		if err == nil && mongoAch != nil {
+			// Count by type
+			typeCount[mongoAch.AchievementType]++
+
+			// Count by period (year)
+			year := mongoAch.CreatedAt.Year()
+			yearStr := fmt.Sprintf("%d", year)
+			periodCount[yearStr]++
+
+			// Count competition levels if it's competition type
+			if mongoAch.AchievementType == "competition" {
+				if mongoAch.Details != nil {
+					if level, exists := mongoAch.Details["competition_level"]; exists {
+						if levelStr, ok := level.(string); ok {
+							levelCount[levelStr]++
+						}
+					}
+				}
+			}
 		}
+
+		// Count by student
+		studentAchievementCount[ach.StudentID]++
+	}
+
+	// Find top 5 students
+	type studentStat struct {
+		StudentID        string
+		AchievementCount int64
+	}
+	var topStudents []studentStat
+	for studentID, count := range studentAchievementCount {
+		topStudents = append(topStudents, studentStat{studentID, count})
+	}
+	// Simple sorting (bubble sort)
+	for i := 0; i < len(topStudents)-1; i++ {
+		for j := 0; j < len(topStudents)-1-i; j++ {
+			if topStudents[j].AchievementCount < topStudents[j+1].AchievementCount {
+				topStudents[j], topStudents[j+1] = topStudents[j+1], topStudents[j]
+			}
+		}
+	}
+	if len(topStudents) > 5 {
+		topStudents = topStudents[:5]
 	}
 
 	total := int64(len(achievements))
 	verificationRate := 0.0
 	if total > 0 {
-		verificationRate = float64(verified) / float64(total) * 100
+		verificationRate = float64(statusCount["verified"]) / float64(total) * 100
 	}
 
 	return fiber.Map{
-		"total":             total,
-		"draft":             draft,
-		"pending":           pending,
-		"verified":          verified,
-		"rejected":          rejected,
-		"verification_rate": verificationRate,
+		"summary": fiber.Map{
+			"total":             total,
+			"verification_rate": verificationRate,
+		},
+		"by_status":            statusCount,
+		"by_type":              typeCount,
+		"by_competition_level": levelCount,
+		"by_period":            periodCount,
+		"top_students":         topStudents,
 	}
 }
 
@@ -434,9 +664,9 @@ func (s *achievementServiceImpl) buildStatistics(achievements []models.Achieveme
 // @Accept json
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.MessageResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /achievements/{id}/verify [post]
 // @Security Bearer
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
@@ -484,10 +714,10 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Param body body map[string]string true "Rejection data"
-// @Success 200 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Param body body models.MessageResponse true "Rejection data"
+// @Success 200 {object} models.MessageResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /achievements/{id}/reject [post]
 // @Security Bearer
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
@@ -544,10 +774,10 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Achievement ID"
 // @Param file formData file true "File to upload"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /achievements/{id}/attachments [post]
 // @Security Bearer
 func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
@@ -568,6 +798,12 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 	achievement, err := s.pgRepo.FindByID(achievementID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
+	}
+
+	// Check if achievement is still in draft status
+	// Can only upload attachments when status is "draft"
+	if achievement.Status != "draft" {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "attachments can only be uploaded for draft achievements. Current status: "+achievement.Status)
 	}
 
 	// Verify ownership
@@ -635,4 +871,162 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 		"file_size":      file.Size,
 		"uploaded_at":    time.Now(),
 	})
+}
+
+// GetStudentReport handles getting detailed report of specific student's achievements
+// @Summary Get student achievement report
+// @Description Get comprehensive achievement report for a specific student
+// @Tags Reports
+// @Produce json
+// @Param id path string true "Student User ID (UUID)"
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /reports/student/{id} [get]
+// @Security Bearer
+func (s *achievementServiceImpl) GetStudentReport(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	role := c.Locals("role").(string)
+	studentUserID := c.Params("id") // This is the User ID of the student
+
+	if studentUserID == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "student id is required")
+	}
+
+	// Authorization check
+	if role == "Mahasiswa" && userID != studentUserID {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only view your own report")
+	}
+
+	if role == "Dosen" || role == "Dosen Wali" {
+		// Check if student is their advisee
+		student, err := s.studentRepo.FindByUserID(studentUserID)
+		if err != nil || student == nil {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, "student not found")
+		}
+		if student.AdvisorID != userID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only view your advisees' reports")
+		}
+	}
+
+	// Get student info
+	student, err := s.studentRepo.FindByUserID(studentUserID)
+	if err != nil || student == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "student not found")
+	}
+
+	// Get user info for name
+	user, err := repository.NewUserRepository().FindByID(studentUserID)
+	if err != nil || user == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "user not found")
+	}
+
+	// Get all achievements for student
+	achievements, err := s.pgRepo.FindByStudentID(studentUserID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retrieve achievements")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Build detailed report
+	report := s.buildStudentReport(ctx, student, user, achievements)
+	return utils.SuccessResponse(c, "student report retrieved successfully", report)
+}
+
+// buildStudentReport builds comprehensive student achievement report
+func (s *achievementServiceImpl) buildStudentReport(ctx context.Context, student *models.Student, user *models.User, achievements []models.AchievementReference) fiber.Map {
+	// Basic student info
+	report := fiber.Map{
+		"student_id":    student.ID,
+		"user_id":       student.UserID,
+		"nim":           student.StudentID,
+		"name":          user.FullName,
+		"email":         user.Email,
+		"program_study": student.ProgramStudy,
+		"academic_year": student.AcademicYear,
+	}
+
+	// Count achievements by status
+	statusCount := map[string]int64{
+		"draft":     0,
+		"submitted": 0,
+		"verified":  0,
+		"rejected":  0,
+	}
+
+	// Count by type
+	typeCount := map[string]int64{
+		"competition":   0,
+		"publication":   0,
+		"organization":  0,
+		"certification": 0,
+	}
+
+	// Competition levels
+	levelCount := map[string]int64{
+		"school":        0,
+		"city":          0,
+		"provincial":    0,
+		"national":      0,
+		"international": 0,
+	}
+
+	// Detailed achievements with mongo details
+	var detailedAchievements []fiber.Map
+
+	for _, ach := range achievements {
+		statusCount[ach.Status]++
+
+		mongoAch, err := s.mongoRepo.FindByID(ctx, ach.MongoAchievementID)
+		if err == nil && mongoAch != nil {
+			typeCount[mongoAch.AchievementType]++
+
+			// Count competition levels
+			if mongoAch.AchievementType == "competition" && mongoAch.Details != nil {
+				if level, exists := mongoAch.Details["competition_level"]; exists {
+					if levelStr, ok := level.(string); ok {
+						levelCount[levelStr]++
+					}
+				}
+			}
+
+			// Add to detailed list
+			detailedAchievements = append(detailedAchievements, fiber.Map{
+				"achievement_id": ach.ID,
+				"title":          mongoAch.Title,
+				"type":           mongoAch.AchievementType,
+				"description":    mongoAch.Description,
+				"status":         ach.Status,
+				"points":         mongoAch.Points,
+				"details":        mongoAch.Details,
+				"created_at":     mongoAch.CreatedAt,
+				"updated_at":     mongoAch.UpdatedAt,
+			})
+		}
+	}
+
+	// Calculate statistics
+	total := int64(len(achievements))
+	verificationRate := 0.0
+	if total > 0 {
+		verificationRate = float64(statusCount["verified"]) / float64(total) * 100
+	}
+
+	// Build final report
+	report["statistics"] = fiber.Map{
+		"total":             total,
+		"verified":          statusCount["verified"],
+		"submitted":         statusCount["submitted"],
+		"draft":             statusCount["draft"],
+		"rejected":          statusCount["rejected"],
+		"verification_rate": verificationRate,
+	}
+	report["by_type"] = typeCount
+	report["by_competition_level"] = levelCount
+	report["achievements"] = detailedAchievements
+
+	return report
 }

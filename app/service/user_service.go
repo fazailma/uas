@@ -53,7 +53,7 @@ func NewUserService() UserService {
 // @Produce json
 // @Param body body models.CreateUserRequest true "User data"
 // @Success 201 {object} models.UserResponse
-// @Failure 400 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
 // @Router /admin/users [post]
 // @Security Bearer
 func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
@@ -128,8 +128,8 @@ func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
 // @Param id path string true "User ID"
 // @Param body body models.UpdateUserRequest true "Updated user data"
 // @Success 200 {object} models.UserResponse
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /admin/users/{id} [put]
 // @Security Bearer
 func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
@@ -191,8 +191,8 @@ func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
 // @Tags User
 // @Produce json
 // @Param id path string true "User ID"
-// @Success 200 {object} map[string]string
-// @Failure 404 {object} map[string]string
+// @Success 200 {object} models.MessageResponse
+// @Failure 404 {object} models.ErrorResponse
 // @Router /admin/users/{id} [delete]
 // @Security Bearer
 func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
@@ -221,7 +221,7 @@ func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "User ID"
 // @Success 200 {object} models.UserResponse
-// @Failure 404 {object} map[string]string
+// @Failure 404 {object} models.ErrorResponse
 // @Router /admin/users/{id} [get]
 // @Security Bearer
 func (s *userServiceImpl) GetUserByID(c *fiber.Ctx) error {
@@ -284,8 +284,8 @@ func (s *userServiceImpl) ListUsers(c *fiber.Ctx) error {
 // @Description Get all achievements from all users (admin only)
 // @Tags User
 // @Produce json
-// @Success 200 {array} models.AchievementDetailResponse
-// @Failure 403 {object} map[string]string
+// @Success 200 {array} models.AchievementReference
+// @Failure 403 {object} models.ErrorResponse
 // @Router /admin/achievements [get]
 // @Security Bearer
 func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
@@ -325,8 +325,8 @@ func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 // @Description Get overall achievement statistics (admin only)
 // @Tags User
 // @Produce json
-// @Success 200 {object} fiber.Map
-// @Failure 403 {object} map[string]string
+// @Success 200 {object} models.StatisticsResponse
+// @Failure 403 {object} models.ErrorResponse
 // @Router /admin/achievements/stats [get]
 // @Security Bearer
 func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
@@ -362,11 +362,11 @@ func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "User ID"
-// @Param body body map[string]string true "Role data"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Param body body models.MessageResponse true "Role data"
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /users/{id}/role [put]
 // @Security Bearer
 func (s *userServiceImpl) UpdateUserRole(c *fiber.Ctx) error {
@@ -411,9 +411,9 @@ func (s *userServiceImpl) UpdateUserRole(c *fiber.Ctx) error {
 // @Tags Reports
 // @Produce json
 // @Param id path string true "Student ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} models.AchievementListResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /reports/student/{id} [get]
 // @Security Bearer
 func (s *userServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {

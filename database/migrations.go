@@ -13,7 +13,6 @@ func RunMigrations(db *gorm.DB) {
 	log.Println("Running database migrations...")
 
 	// AutoMigrate akan membuat tabel jika belum ada
-	// 7 model: user, role, permission, role_permission, student, lecturer, achievement_reference
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Role{},

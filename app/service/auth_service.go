@@ -42,9 +42,9 @@ func NewAuthService() AuthService {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param body body models.LoginCredential true \"Login credentials\"
-// @Success 200 {object} fiber.Map \"token and user data\"
-// @Failure 401 {object} map[string]string
+// @Param body body models.LoginCredential true "Login credentials"
+// @Success 200 {object} models.LoginResponse "token and user data"
+// @Failure 401 {object} models.ErrorResponse
 // @Router /auth/login [post]
 func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 	var req models.LoginCredential

@@ -3,30 +3,42 @@ package main
 import (
 	"log"
 
+	"UAS/database"
+	_ "UAS/docs" // Import docs untuk Swagger (underscore karena hanya butuh side effect)
+	"UAS/routes"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/joho/godotenv"
-	fiberSwagger "github.com/swaggo/fiber-swagger"
-
-	"UAS/database"
-	_ "UAS/docs"
-	"UAS/routes"
+	swagger "github.com/swaggo/fiber-swagger" // Ganti import swagger
 )
 
 // @title Achievement Management Backend API
 // @version 1.0
-// @description API for managing student achievements with role-based access control
-// @termsOfService http://swagger.io/terms/
+// @description API untuk manajemen prestasi akademik mahasiswa
+
 // @contact.name API Support
-// @license.name Apache 2.0
-// @basePath /api/v1
+// @contact.url http://www.example.com/support
+// @contact.email support@example.com
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /api/v1
 // @schemes http https
 
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 func main() {
-	// Load env
+	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env not found")
+		log.Println("Warning: No .env file found")
 	}
 
 	// Connect PostgreSQL
@@ -51,13 +63,17 @@ func main() {
 
 	// Middleware
 	app.Use(logger.New())
+	app.Use(recover.New())
 	app.Use(cors.New())
+
+	// Swagger endpoint - Ganti dengan swagger handler yang benar
+	app.Get("/swagger/*", swagger.WrapHandler)
+
+	// Serve static files for uploads
+	app.Static("/uploads", "./uploads")
 
 	// Setup routes
 	routes.SetupRoutes(app)
-
-	// Swagger UI
-	app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
 	// Health check endpoint
 	app.Get("/", func(c *fiber.Ctx) error {
@@ -69,6 +85,7 @@ func main() {
 
 	// Start server
 	log.Println("Server running on http://localhost:8080")
+	log.Println("Swagger documentation: http://localhost:8080/swagger/index.html")
 	if err := app.Listen(":8080"); err != nil {
 		log.Fatal(err)
 	}

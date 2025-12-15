@@ -1,0 +1,1284 @@
+basePath: /api/v1
+definitions:
+  models.AchievementListResponse:
+    properties:
+      achievements:
+        items:
+          $ref: '#/definitions/models.AchievementReference'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.AchievementReference:
+    properties:
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      mongo_achievement_id:
+        type: string
+      rejection_note:
+        type: string
+      status:
+        description: draft, submitted, verified, rejected
+        type: string
+      student_id:
+        type: string
+      submitted_at:
+        type: string
+      updated_at:
+        type: string
+      verified_at:
+        type: string
+      verified_by:
+        type: string
+    type: object
+  models.CreateAchievementRequest:
+    properties:
+      achievement_type:
+        description: '''academic'', ''competition'', ''organization'', ''publication'',
+          ''certification'', ''other'''
+        type: string
+      description:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      points:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    required:
+    - achievement_type
+    - title
+    type: object
+  models.CreateUserRequest:
+    properties:
+      academic_year:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      program_study:
+        type: string
+      role_id:
+        type: string
+      student_id:
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - full_name
+    - password
+    - role_id
+    - username
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  models.Lecturer:
+    properties:
+      created_at:
+        type: string
+      department:
+        type: string
+      id:
+        type: string
+      lecturer_id:
+        description: NIP
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.LecturerListResponse:
+    properties:
+      lecturers:
+        items:
+          $ref: '#/definitions/models.Lecturer'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.LoginCredential:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  models.LoginResponse:
+    properties:
+      data:
+        $ref: '#/definitions/models.LoginResponseData'
+      status:
+        type: string
+    type: object
+  models.LoginResponseData:
+    properties:
+      refreshToken:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.UserProfile'
+    type: object
+  models.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  models.StatisticsResponse:
+    properties:
+      by_status:
+        additionalProperties:
+          type: integer
+        type: object
+      by_type:
+        additionalProperties:
+          type: integer
+        type: object
+      total_achievements:
+        type: integer
+      total_points:
+        type: integer
+    type: object
+  models.Student:
+    properties:
+      academic_year:
+        type: string
+      advisor_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      program_study:
+        type: string
+      student_id:
+        description: NIM
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.StudentListResponse:
+    properties:
+      students:
+        items:
+          $ref: '#/definitions/models.Student'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  models.UpdateAchievementRequest:
+    properties:
+      achievement_type:
+        type: string
+      description:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      points:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  models.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      is_active:
+        type: boolean
+      role_id:
+        type: string
+    type: object
+  models.UserProfile:
+    properties:
+      fullName:
+        type: string
+      id:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  models.UserResponse:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      role:
+        type: string
+      role_id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: http://www.example.com/support
+  description: API untuk manajemen prestasi akademik mahasiswa
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Achievement Management Backend API
+  version: "1.0"
+paths:
+  /achievements:
+    get:
+      description: Get list of achievements based on user role
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AchievementReference'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: List achievements
+      tags:
+      - Achievements
+    post:
+      consumes:
+      - application/json
+      description: Create a new achievement for the logged-in student
+      parameters:
+      - description: Achievement data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateAchievementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.AchievementReference'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Create new achievement
+      tags:
+      - Achievements
+  /achievements/{id}:
+    delete:
+      description: Delete an achievement (only draft status)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Delete achievement
+      tags:
+      - Achievements
+    get:
+      description: Retrieve detailed information of a specific achievement
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AchievementReference'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get achievement detail
+      tags:
+      - Achievements
+    put:
+      consumes:
+      - application/json
+      description: Update an existing achievement (only draft status)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated achievement data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateAchievementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AchievementReference'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Update achievement
+      tags:
+      - Achievements
+  /achievements/{id}/attachments:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload proof files for an achievement
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Upload achievement attachment
+      tags:
+      - Achievements
+  /achievements/{id}/history:
+    get:
+      description: Get the timeline/history of an achievement's status changes
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get achievement history
+      tags:
+      - Achievements
+  /achievements/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject an achievement submission with notes (Dosen Wali only)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rejection data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Reject achievement
+      tags:
+      - Achievements
+  /achievements/{id}/submit:
+    post:
+      description: Submit an achievement for verification (changes status from draft
+        to submitted)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Submit achievement
+      tags:
+      - Achievements
+  /achievements/{id}/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify an achievement submission (Dosen Wali only)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Verify achievement
+      tags:
+      - Achievements
+  /achievements/stats:
+    get:
+      description: Get comprehensive statistics of achievements based on user role
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StatisticsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get achievement statistics
+      tags:
+      - Achievements
+  /admin/achievements:
+    get:
+      description: Get all achievements from all users (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AchievementReference'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get all achievements
+      tags:
+      - User
+  /admin/achievements/stats:
+    get:
+      description: Get overall achievement statistics (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StatisticsResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get achievement statistics
+      tags:
+      - User
+  /admin/users:
+    get:
+      description: Get paginated list of all users
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserResponse'
+            type: array
+      security:
+      - Bearer: []
+      summary: List users
+      tags:
+      - User
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: User data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Create user
+      tags:
+      - User
+  /admin/users/{id}:
+    delete:
+      description: Soft delete a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Delete user
+      tags:
+      - User
+    get:
+      description: Retrieve a specific user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get user by ID
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      description: Update user information
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated user data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Update user
+      tags:
+      - User
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginCredential'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: token and user data
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: User login
+      tags:
+      - Auth
+  /lecturer/achievements:
+    get:
+      description: Get all achievements of students guided by current lecturer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AchievementReference'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get guided students achievements
+      tags:
+      - Lecturer
+  /lecturer/achievements/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject a submitted achievement (Dosen Wali only)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rejection note
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Reject achievement
+      tags:
+      - Lecturer
+  /lecturer/achievements/{id}/verify:
+    post:
+      description: Verify a submitted achievement (Dosen Wali only)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Verify achievement
+      tags:
+      - Lecturer
+  /lecturers:
+    get:
+      description: Get paginated list of all lecturers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LecturerListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: List all lecturers
+      tags:
+      - Lecturers
+    post:
+      consumes:
+      - application/json
+      description: Create a new lecturer profile for a user
+      parameters:
+      - description: Lecturer data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.Lecturer'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Lecturer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Create lecturer profile
+      tags:
+      - Lecturer
+  /lecturers/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update an existing lecturer profile
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lecturer data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.Lecturer'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Lecturer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Update lecturer profile
+      tags:
+      - Lecturer
+  /lecturers/{id}/advisees:
+    get:
+      description: Get list of students guided by a lecturer
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StudentListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get lecturer's advisees
+      tags:
+      - Lecturers
+  /reports/student/{id}:
+    get:
+      description: Get all achievements for a specific student (Admin)
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AchievementListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get student achievements
+      tags:
+      - Reports
+  /students:
+    get:
+      description: Get paginated list of all students
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StudentListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: List all students
+      tags:
+      - Students
+    post:
+      consumes:
+      - application/json
+      description: Create a new student profile for a user
+      parameters:
+      - description: Student data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.Student'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Student'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Create student profile
+      tags:
+      - Student
+  /students/{id}:
+    get:
+      description: Get detailed information of a student
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Student'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get student detail
+      tags:
+      - Students
+    put:
+      consumes:
+      - application/json
+      description: Update an existing student profile
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Student data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.Student'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Student'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Update student profile
+      tags:
+      - Student
+  /students/{id}/achievements:
+    get:
+      description: Get all achievements for a specific student
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AchievementListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Get student achievements
+      tags:
+      - Students
+  /students/{id}/advisor:
+    put:
+      consumes:
+      - application/json
+      description: Assign a lecturer as advisor for a student
+      parameters:
+      - description: Student UUID ID (from database, not NIM)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Advisor user ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Set student advisor
+      tags:
+      - Student
+  /users/{id}/role:
+    put:
+      consumes:
+      - application/json
+      description: Update role for a user (Admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Update user role
+      tags:
+      - Users
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

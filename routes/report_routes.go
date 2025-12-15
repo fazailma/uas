@@ -9,10 +9,11 @@ import (
 
 // SetupReportRoutes sets up report and analytics routes
 func SetupReportRoutes(app *fiber.App) {
-	userSvc := service.NewUserService()
+	achievementSvc := service.NewAchievementService()
 	g := app.Group("/api/v1/reports", middleware.AuthMiddleware)
 
 	// Report and Analytics
-	g.Get("/statistics", middleware.RBACMiddleware("report:read"), userSvc.GetAchievementStats)
-	g.Get("/student/:id", middleware.RBACMiddleware("report:read"), userSvc.GetStudentAchievements)
+	// Authorization handled in service layer: Admin sees all, Mahasiswa sees own, Dosen/Dosen Wali sees advisees
+	g.Get("/statistics", achievementSvc.GetStatistics)
+	g.Get("/student/:id", achievementSvc.GetStudentReport)
 }
