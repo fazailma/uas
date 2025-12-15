@@ -13,5 +13,8 @@ func SetupLecturerRoutes(app *fiber.App) {
 
 	// Lecturer Management
 	g.Get("/", middleware.RBACMiddleware("lecturer:read"), svc.ListLecturers)
+	// Create/Update lecturer profile - Admin only (user:manage permission)
+	g.Post("/", middleware.RBACMiddleware("user:manage"), svc.CreateLecturerProfile)
+	g.Put("/:id", middleware.RBACMiddleware("user:manage"), svc.UpdateLecturerProfile)
 	g.Get("/:id/advisees", middleware.RBACMiddleware("lecturer:read"), svc.GetAdvisees)
 }

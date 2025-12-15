@@ -5,14 +5,18 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 
+	"UAS/app/models"
 	"UAS/app/repository"
 	"UAS/utils"
 )
 
 // LecturerService defines all lecturer-related operations
 type LecturerService interface {
+	CreateLecturerProfile(c *fiber.Ctx) error
 	ListLecturers(c *fiber.Ctx) error
+	UpdateLecturerProfile(c *fiber.Ctx) error
 	GetAdvisees(c *fiber.Ctx) error
 	VerifyAchievement(c *fiber.Ctx) error
 	RejectAchievement(c *fiber.Ctx) error
@@ -35,6 +39,112 @@ func NewLecturerService() LecturerService {
 		studentRepo:     repository.NewStudentRepository(),
 		mongoRepo:       repository.NewMongoAchievementRepository(),
 	}
+}
+
+// CreateLecturerProfile handles creating lecturer profile
+// @Summary Create lecturer profile
+// @Description Create a new lecturer profile for a user
+// @Tags Lecturer
+// @Accept json
+// @Produce json
+// @Param body body models.Lecturer true "Lecturer data"
+// @Success 201 {object} models.Lecturer
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /lecturers [post]
+// @Security Bearer
+func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
+	var req struct {
+		UserID     string `json:"user_id" validate:"required"`
+		LecturerID string `json:"lecturer_id" validate:"required"` // NIP
+		Department string `json:"department" validate:"required"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	// Validate required fields
+	if req.UserID == "" || req.LecturerID == "" || req.Department == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "user_id, lecturer_id, and department are required")
+	}
+
+	// Verify user exists and has Dosen role
+	user, err := s.userRepo.FindByID(req.UserID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "user not found")
+	}
+
+	roleRepo := repository.NewRoleRepository()
+	role, err := roleRepo.FindByID(user.RoleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "role not found for this user")
+	}
+
+	// Check if role is Dosen (case-insensitive and flexible)
+	isDosenRole := role.Name == "Dosen" || role.Name == "Lecturer" ||
+		role.Name == "Dosen Wali" || role.Name == "dosen" || role.Name == "lecturer"
+
+	if !isDosenRole {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "user must have Dosen/Lecturer role, current role: "+role.Name)
+	}
+
+	lecturer := &models.Lecturer{
+		ID:         uuid.New().String(),
+		UserID:     req.UserID,
+		LecturerID: req.LecturerID,
+		Department: req.Department,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	if err := s.lecturerRepo.Create(lecturer); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create lecturer profile")
+	}
+
+	return utils.SuccessResponse(c, "lecturer profile created successfully", lecturer)
+}
+
+// UpdateLecturerProfile handles updating lecturer profile
+// @Summary Update lecturer profile
+// @Description Update an existing lecturer profile
+// @Tags Lecturer
+// @Accept json
+// @Produce json
+// @Param id path string true "Lecturer ID"
+// @Param body body models.Lecturer true "Lecturer data"
+// @Success 200 {object} models.Lecturer
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /lecturers/{id} [put]
+// @Security Bearer
+func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
+	lecturerID := c.Params("id")
+
+	var req struct {
+		Department string `json:"department"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	lecturer, err := s.lecturerRepo.FindByLecturerID(lecturerID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
+	}
+
+	if req.Department != "" {
+		lecturer.Department = req.Department
+	}
+
+	lecturer.UpdatedAt = time.Now()
+
+	if err := s.lecturerRepo.Update(lecturerID, lecturer); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update lecturer profile")
+	}
+
+	return utils.SuccessResponse(c, "lecturer profile updated successfully", lecturer)
 }
 
 // VerifyAchievement handles achievement verification
@@ -182,19 +292,20 @@ func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error 
 		}
 
 		result = append(result, map[string]interface{}{
-			"id":             ach.ID,
-			"student_id":     ach.StudentID,
-			"title":          mongoAch.Title,
-			"description":    mongoAch.Description,
-			"category":       mongoAch.Category,
-			"date":           mongoAch.Date,
-			"proof_url":      mongoAch.ProofURL,
-			"status":         ach.Status,
-			"submitted_at":   ach.SubmittedAt,
-			"verified_at":    ach.VerifiedAt,
-			"verified_by":    ach.VerifiedBy,
-			"rejection_note": ach.RejectionNote,
-			"created_at":     ach.CreatedAt,
+			"id":               ach.ID,
+			"student_id":       ach.StudentID,
+			"title":            mongoAch.Title,
+			"description":      mongoAch.Description,
+			"achievement_type": mongoAch.AchievementType,
+			"details":          mongoAch.Details,
+			"tags":             mongoAch.Tags,
+			"points":           mongoAch.Points,
+			"status":           ach.Status,
+			"submitted_at":     ach.SubmittedAt,
+			"verified_at":      ach.VerifiedAt,
+			"verified_by":      ach.VerifiedBy,
+			"rejection_note":   ach.RejectionNote,
+			"created_at":       ach.CreatedAt,
 		})
 	}
 

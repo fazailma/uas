@@ -7,10 +7,21 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 
 	"UAS/database"
+	_ "UAS/docs"
 	"UAS/routes"
 )
+
+// @title Achievement Management Backend API
+// @version 1.0
+// @description API for managing student achievements with role-based access control
+// @termsOfService http://swagger.io/terms/
+// @contact.name API Support
+// @license.name Apache 2.0
+// @basePath /api/v1
+// @schemes http https
 
 func main() {
 	// Load env
@@ -44,6 +55,9 @@ func main() {
 
 	// Setup routes
 	routes.SetupRoutes(app)
+
+	// Swagger UI
+	app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
 	// Health check endpoint
 	app.Get("/", func(c *fiber.Ctx) error {

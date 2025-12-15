@@ -93,7 +93,8 @@ func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create user")
 	}
 
-	if req.StudentID != "" {
+	// Auto-create student profile if role is Mahasiswa and student_id provided
+	if role.Name == "Mahasiswa" && req.StudentID != "" {
 		if err := s.studentRepo.Create(&models.Student{
 			ID:           uuid.New().String(),
 			UserID:       user.ID,
@@ -303,15 +304,16 @@ func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 		}
 
 		results = append(results, &models.AchievementDetailResponse{
-			ID:          mongoAchievement.ID.Hex(),
-			Title:       mongoAchievement.Title,
-			Description: mongoAchievement.Description,
-			Category:    mongoAchievement.Category,
-			Date:        mongoAchievement.Date,
-			ProofURL:    mongoAchievement.ProofURL,
-			Status:      ref.Status,
-			StudentID:   mongoAchievement.StudentID,
-			CreatedAt:   mongoAchievement.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:              mongoAchievement.ID.Hex(),
+			Title:           mongoAchievement.Title,
+			Description:     mongoAchievement.Description,
+			AchievementType: mongoAchievement.AchievementType,
+			Details:         mongoAchievement.Details,
+			Tags:            mongoAchievement.Tags,
+			Points:          mongoAchievement.Points,
+			Status:          ref.Status,
+			StudentID:       mongoAchievement.StudentID,
+			CreatedAt:       mongoAchievement.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
 

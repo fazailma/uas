@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -61,8 +62,8 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Title == "" || req.Category == "" || req.Date == "" {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "title, category, and date are required")
+	if req.Title == "" || req.AchievementType == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "title and achievement_type are required")
 	}
 
 	if c.Locals("role") != "Mahasiswa" {
@@ -73,12 +74,15 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	defer cancel()
 
 	mongoAch, err := s.mongoRepo.Create(ctx, &models.MongoAchievement{
-		StudentID:   c.Locals("user_id").(string),
-		Title:       req.Title,
-		Description: req.Description,
-		Category:    req.Category,
-		Date:        req.Date,
-		ProofURL:    req.ProofURL,
+		StudentID:       c.Locals("user_id").(string),
+		Title:           req.Title,
+		Description:     req.Description,
+		AchievementType: req.AchievementType,
+		Details:         req.Details,
+		Tags:            req.Tags,
+		Points:          req.Points,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	})
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to save achievement")
@@ -195,12 +199,13 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	defer cancel()
 
 	if _, err := s.mongoRepo.Update(ctx, achievement.MongoAchievementID, &models.MongoAchievement{
-		StudentID:   c.Locals("user_id").(string),
-		Title:       req.Title,
-		Description: req.Description,
-		Category:    req.Category,
-		Date:        req.Date,
-		ProofURL:    req.ProofURL,
+		StudentID:       c.Locals("user_id").(string),
+		Title:           req.Title,
+		Description:     req.Description,
+		AchievementType: req.AchievementType,
+		Details:         req.Details,
+		Tags:            req.Tags,
+		Points:          req.Points,
 	}); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update achievement")
 	}
@@ -436,9 +441,36 @@ func (s *achievementServiceImpl) buildStatistics(achievements []models.Achieveme
 // @Security Bearer
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
+	dosenID := c.Locals("user_id").(string)
 
-	// Update achievement status to verified
-	if err := s.pgRepo.UpdateStatus(achievementID, "verified"); err != nil {
+	// Get achievement first to update it properly
+	achievement, err := s.pgRepo.FindByID(achievementID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
+	}
+
+	// Check if status is submitted
+	if achievement.Status != "submitted" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "only submitted achievements can be verified")
+	}
+
+	// Verify that the dosen is the advisor of the student
+	student, err := s.studentRepo.FindByUserID(achievement.StudentID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+	}
+
+	if student.AdvisorID != dosenID {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can verify achievements")
+	}
+
+	// Update achievement status, verified_at, and verified_by
+	achievement.Status = "verified"
+	achievement.VerifiedAt = time.Now()
+	achievement.VerifiedBy = dosenID
+	achievement.UpdatedAt = time.Now()
+
+	if err := s.pgRepo.Update(achievementID, achievement); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to verify achievement")
 	}
 
@@ -460,6 +492,7 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Security Bearer
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
+	dosenID := c.Locals("user_id").(string)
 
 	var req struct {
 		RejectionNote string `json:"rejection_note" validate:"required"`
@@ -468,7 +501,35 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
-	if err := s.pgRepo.RejectAchievement(achievementID, req.RejectionNote); err != nil {
+	// Get achievement first to update it properly
+	achievement, err := s.pgRepo.FindByID(achievementID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
+	}
+
+	// Check if status is submitted
+	if achievement.Status != "submitted" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "only submitted achievements can be rejected")
+	}
+
+	// Verify that the dosen is the advisor of the student
+	student, err := s.studentRepo.FindByUserID(achievement.StudentID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+	}
+
+	if student.AdvisorID != dosenID {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can reject achievements")
+	}
+
+	// Update achievement status, rejection note, verified_at, and verified_by
+	achievement.Status = "rejected"
+	achievement.RejectionNote = req.RejectionNote
+	achievement.VerifiedAt = time.Now()
+	achievement.VerifiedBy = dosenID
+	achievement.UpdatedAt = time.Now()
+
+	if err := s.pgRepo.Update(achievementID, achievement); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to reject achievement")
 	}
 
@@ -483,8 +544,9 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Achievement ID"
 // @Param file formData file true "File to upload"
-// @Success 200 {object} map[string]string
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /achievements/{id}/attachments [post]
 // @Security Bearer
@@ -502,14 +564,75 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "file size exceeds 10MB limit")
 	}
 
-	// Save file (implementation depends on your storage setup)
-	// For now, we'll just acknowledge the upload
-	filename := uuid.New().String() + "_" + file.Filename
+	// Verify achievement exists
+	achievement, err := s.pgRepo.FindByID(achievementID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
+	}
 
-	// Update achievement with attachment URL
-	// In production, this would be the actual file path/URL
+	// Verify ownership
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only upload attachments to your own achievements")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get MongoDB achievement to add attachment
+	mongoAch, err := s.mongoRepo.FindByID(ctx, achievement.MongoAchievementID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found in database")
+	}
+
+	// Save file to local storage or cloud storage
+	// For now, we'll store the file in a local directory
+	uploadDir := "uploads/achievements"
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create upload directory")
+	}
+
+	filename := uuid.New().String() + "_" + file.Filename
+	filepath := uploadDir + "/" + filename
+
+	// Save the file
+	if err := c.SaveFile(file, filepath); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to save file: "+err.Error())
+	}
+
+	// Create attachment object
+	attachment := models.Attachment{
+		FileName:   file.Filename,
+		FileURL:    "/uploads/achievements/" + filename, // URL path for serving file
+		FileType:   file.Header.Get("Content-Type"),
+		UploadedAt: time.Now(),
+	}
+
+	// Add attachment to MongoDB achievement
+	if mongoAch.Attachments == nil {
+		mongoAch.Attachments = []models.Attachment{}
+	}
+	mongoAch.Attachments = append(mongoAch.Attachments, attachment)
+	mongoAch.UpdatedAt = time.Now()
+
+	// Update MongoDB document
+	if _, err := s.mongoRepo.Update(ctx, achievement.MongoAchievementID, mongoAch); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to save attachment record")
+	}
+
+	// Update PostgreSQL timestamp
+	achievement.UpdatedAt = time.Now()
+	if err := s.pgRepo.Update(achievementID, achievement); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update achievement")
+	}
+
 	return utils.SuccessResponse(c, "file uploaded successfully", fiber.Map{
 		"achievement_id": achievementID,
-		"filename":       filename,
+		"file_name":      file.Filename,
+		"file_url":       "/uploads/achievements/" + filename,
+		"file_type":      file.Header.Get("Content-Type"),
+		"file_size":      file.Size,
+		"uploaded_at":    time.Now(),
 	})
 }

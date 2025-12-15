@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"UAS/app/models"
 	"UAS/database"
 )
@@ -21,7 +23,7 @@ func (r *AchievementRepository) Create(achievement *models.AchievementReference)
 // FindByID finds achievement by ID
 func (r *AchievementRepository) FindByID(id string) (*models.AchievementReference, error) {
 	var achievement models.AchievementReference
-	err := database.DB.Where("id = ?", id).First(&achievement).Error
+	err := database.DB.Where("id = ? AND deleted_at IS NULL", id).First(&achievement).Error
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +33,7 @@ func (r *AchievementRepository) FindByID(id string) (*models.AchievementReferenc
 // FindByStudentID finds all achievements by student ID
 func (r *AchievementRepository) FindByStudentID(studentID string) ([]models.AchievementReference, error) {
 	var achievements []models.AchievementReference
-	err := database.DB.Where("student_id = ?", studentID).Order("created_at DESC").Find(&achievements).Error
+	err := database.DB.Where("student_id = ? AND deleted_at IS NULL", studentID).Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +43,7 @@ func (r *AchievementRepository) FindByStudentID(studentID string) ([]models.Achi
 // FindDraftByStudentID finds all draft achievements by student ID
 func (r *AchievementRepository) FindDraftByStudentID(studentID string) ([]models.AchievementReference, error) {
 	var achievements []models.AchievementReference
-	err := database.DB.Where("student_id = ? AND status = ?", studentID, "draft").
+	err := database.DB.Where("student_id = ? AND status = ? AND deleted_at IS NULL", studentID, "draft").
 		Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
@@ -52,7 +54,7 @@ func (r *AchievementRepository) FindDraftByStudentID(studentID string) ([]models
 // FindAll finds all achievements (admin view)
 func (r *AchievementRepository) FindAll() ([]models.AchievementReference, error) {
 	var achievements []models.AchievementReference
-	err := database.DB.Order("created_at DESC").Find(&achievements).Error
+	err := database.DB.Where("deleted_at IS NULL").Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
 	}
@@ -66,18 +68,23 @@ func (r *AchievementRepository) Update(id string, achievement *models.Achievemen
 
 // UpdateStatus updates achievement status (FR-004)
 func (r *AchievementRepository) UpdateStatus(id string, status string) error {
-	return database.DB.Model(&models.AchievementReference{}).Where("id = ?", id).Update("status", status).Error
+	return database.DB.Model(&models.AchievementReference{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Update("status", status).Error
 }
 
 // Delete soft delete an achievement (FR-005)
 func (r *AchievementRepository) Delete(id string) error {
-	return database.DB.Where("id = ?", id).Delete(&models.AchievementReference{}).Error
+	now := time.Now()
+	return database.DB.Model(&models.AchievementReference{}).
+		Where("id = ?", id).
+		Update("deleted_at", now).Error
 }
 
 // FindByStatus finds achievements by status
 func (r *AchievementRepository) FindByStatus(status string) ([]models.AchievementReference, error) {
 	var achievements []models.AchievementReference
-	err := database.DB.Where("status = ?", status).Order("created_at DESC").Find(&achievements).Error
+	err := database.DB.Where("status = ? AND deleted_at IS NULL", status).Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +94,7 @@ func (r *AchievementRepository) FindByStatus(status string) ([]models.Achievemen
 // FindByStudentIDs finds achievements by multiple student IDs
 func (r *AchievementRepository) FindByStudentIDs(studentIDs []string) ([]models.AchievementReference, error) {
 	var achievements []models.AchievementReference
-	err := database.DB.Where("student_id IN ?", studentIDs).Order("created_at DESC").Find(&achievements).Error
+	err := database.DB.Where("student_id IN ? AND deleted_at IS NULL", studentIDs).Order("created_at DESC").Find(&achievements).Error
 	if err != nil {
 		return nil, err
 	}

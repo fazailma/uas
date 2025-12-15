@@ -56,3 +56,34 @@ type RegisterResponse struct {
 	Message string `json:"message"`
 	UserID  string `json:"user_id"`
 }
+
+// CreateUserRequest represents the request payload for creating a new user
+type CreateUserRequest struct {
+	Username     string `json:"username" validate:"required"`
+	Password     string `json:"password" validate:"required"`
+	Email        string `json:"email" validate:"required,email"`
+	FullName     string `json:"full_name" validate:"required"`
+	RoleID       string `json:"role_id" validate:"required"`
+	StudentID    string `json:"student_id,omitempty"`
+	ProgramStudy string `json:"program_study,omitempty"`
+	AcademicYear string `json:"academic_year,omitempty"`
+}
+
+// UpdateUserRequest represents the request payload for updating a user
+type UpdateUserRequest struct {
+	Email    string `json:"email,omitempty"`
+	FullName string `json:"full_name,omitempty"`
+	RoleID   string `json:"role_id,omitempty"`
+	IsActive *bool  `json:"is_active,omitempty"`
+}
+
+// UserResponse represents the response format for user data
+type UserResponse struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	FullName string `json:"full_name"`
+	Role     string `json:"role"`
+	RoleID   string `json:"role_id"`
+	IsActive bool   `json:"is_active"`
+}

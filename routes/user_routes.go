@@ -10,7 +10,7 @@ import (
 // SetupUserRoutes sets up user management routes
 func SetupUserRoutes(app *fiber.App) {
 	svc := service.NewUserService()
-	g := app.Group("/api/v1/users", middleware.AuthMiddleware, middleware.RBACMiddleware("admin:manage"))
+	g := app.Group("/api/v1/users", middleware.AuthMiddleware, middleware.RBACMiddleware("user:manage"))
 
 	// User Management
 	g.Get("/", svc.ListUsers)

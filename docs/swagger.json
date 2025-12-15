@@ -1,0 +1,100 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Achievement Management Backend API",
+    "description": "API for managing student achievements with role-based access control",
+    "termsOfService": "http://swagger.io/terms/",
+    "contact": {
+      "name": "API Support"
+    },
+    "license": {
+      "name": "Apache 2.0"
+    },
+    "version": "1.0"
+  },
+  "host": "localhost:8080",
+  "basePath": "/api/v1",
+  "schemes": ["http", "https"],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "description": "Authenticate user with credentials",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["Auth"],
+        "summary": "User login",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "description": "Logout user",
+        "produces": ["application/json"],
+        "tags": ["Auth"],
+        "summary": "User logout",
+        "security": [{"Bearer": []}],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "description": "Refresh expired JWT token",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["Auth"],
+        "summary": "Refresh token",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          }
+        }
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "description": "Get current authenticated user profile",
+        "produces": ["application/json"],
+        "tags": ["Auth"],
+        "summary": "Get user profile",
+        "security": [{"Bearer": []}],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "Bearer": {
+      "description": "JWT Authorization header using the Bearer scheme",
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  }
+}

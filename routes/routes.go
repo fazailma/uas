@@ -5,6 +5,8 @@ import (
 )
 
 // SetupRoutes sets up all routes for the application
+// @Summary Setup all API routes
+// @Description Configure all authentication, achievement, user, student, lecturer and report routes
 func SetupRoutes(app *fiber.App) {
 	// Setup auth routes
 	SetupAuthRoutes(app)
