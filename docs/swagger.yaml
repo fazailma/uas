@@ -1,14 +1,5 @@
 basePath: /api/v1
 definitions:
-  models.AchievementListResponse:
-    properties:
-      achievements:
-        items:
-          $ref: '#/definitions/models.AchievementReference'
-        type: array
-      total:
-        type: integer
-    type: object
   models.AchievementReference:
     properties:
       created_at:
@@ -83,11 +74,6 @@ definitions:
     - role_id
     - username
     type: object
-  models.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
   models.Lecturer:
     properties:
       created_at:
@@ -104,57 +90,12 @@ definitions:
       user_id:
         type: string
     type: object
-  models.LecturerListResponse:
-    properties:
-      lecturers:
-        items:
-          $ref: '#/definitions/models.Lecturer'
-        type: array
-      total:
-        type: integer
-    type: object
   models.LoginCredential:
     properties:
       password:
         type: string
       username:
         type: string
-    type: object
-  models.LoginResponse:
-    properties:
-      data:
-        $ref: '#/definitions/models.LoginResponseData'
-      status:
-        type: string
-    type: object
-  models.LoginResponseData:
-    properties:
-      refreshToken:
-        type: string
-      token:
-        type: string
-      user:
-        $ref: '#/definitions/models.UserProfile'
-    type: object
-  models.MessageResponse:
-    properties:
-      message:
-        type: string
-    type: object
-  models.StatisticsResponse:
-    properties:
-      by_status:
-        additionalProperties:
-          type: integer
-        type: object
-      by_type:
-        additionalProperties:
-          type: integer
-        type: object
-      total_achievements:
-        type: integer
-      total_points:
-        type: integer
     type: object
   models.Student:
     properties:
@@ -174,21 +115,6 @@ definitions:
       updated_at:
         type: string
       user_id:
-        type: string
-    type: object
-  models.StudentListResponse:
-    properties:
-      students:
-        items:
-          $ref: '#/definitions/models.Student'
-        type: array
-      total:
-        type: integer
-    type: object
-  models.SuccessResponse:
-    properties:
-      data: {}
-      message:
         type: string
     type: object
   models.UpdateAchievementRequest:
@@ -218,21 +144,6 @@ definitions:
       is_active:
         type: boolean
       role_id:
-        type: string
-    type: object
-  models.UserProfile:
-    properties:
-      fullName:
-        type: string
-      id:
-        type: string
-      permissions:
-        items:
-          type: string
-        type: array
-      role:
-        type: string
-      username:
         type: string
     type: object
   models.UserResponse:
@@ -280,7 +191,8 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: List achievements
@@ -307,11 +219,13 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Create new achievement
@@ -332,19 +246,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Delete achievement
@@ -368,11 +286,13 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get achievement detail
@@ -404,15 +324,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Update achievement
@@ -440,19 +363,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SuccessResponse'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Upload achievement attachment
@@ -473,15 +400,18 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SuccessResponse'
+            additionalProperties: true
+            type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get achievement history
@@ -503,22 +433,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.MessageResponse'
+          additionalProperties: true
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Reject achievement
@@ -540,19 +474,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Submit achievement
@@ -575,219 +513,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Verify achievement
       tags:
       - Achievements
-  /achievements/stats:
-    get:
-      description: Get comprehensive statistics of achievements based on user role
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.StatisticsResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Get achievement statistics
-      tags:
-      - Achievements
-  /admin/achievements:
-    get:
-      description: Get all achievements from all users (admin only)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.AchievementReference'
-            type: array
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Get all achievements
-      tags:
-      - User
-  /admin/achievements/stats:
-    get:
-      description: Get overall achievement statistics (admin only)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.StatisticsResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Get achievement statistics
-      tags:
-      - User
-  /admin/users:
-    get:
-      description: Get paginated list of all users
-      parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.UserResponse'
-            type: array
-      security:
-      - Bearer: []
-      summary: List users
-      tags:
-      - User
-    post:
-      consumes:
-      - application/json
-      description: Create a new user account
-      parameters:
-      - description: User data
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.CreateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/models.UserResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Create user
-      tags:
-      - User
-  /admin/users/{id}:
-    delete:
-      description: Soft delete a user account
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.MessageResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Delete user
-      tags:
-      - User
-    get:
-      description: Retrieve a specific user by ID
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.UserResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Get user by ID
-      tags:
-      - User
-    put:
-      consumes:
-      - application/json
-      description: Update user information
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Updated user data
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.UserResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Update user
-      tags:
-      - User
   /auth/login:
     post:
       consumes:
@@ -806,12 +548,92 @@ paths:
         "200":
           description: token and user data
           schema:
-            $ref: '#/definitions/models.LoginResponse'
+            additionalProperties: true
+            type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       summary: User login
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      description: Logout user (client should delete tokens)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: User logout
+      tags:
+      - Auth
+  /auth/profile:
+    get:
+      description: Get current authenticated user profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Get user profile
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Generate new access token using refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Refresh access token
       tags:
       - Auth
   /lecturer/achievements:
@@ -829,82 +651,18 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get guided students achievements
       tags:
-      - Lecturer
-  /lecturer/achievements/{id}/reject:
-    post:
-      consumes:
-      - application/json
-      description: Reject a submitted achievement (Dosen Wali only)
-      parameters:
-      - description: Achievement ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Rejection note
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.MessageResponse'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.MessageResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Reject achievement
-      tags:
-      - Lecturer
-  /lecturer/achievements/{id}/verify:
-    post:
-      description: Verify a submitted achievement (Dosen Wali only)
-      parameters:
-      - description: Achievement ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.MessageResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Verify achievement
-      tags:
-      - Lecturer
+      - Lecturers
   /lecturers:
     get:
       description: Get paginated list of all lecturers
@@ -914,11 +672,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.LecturerListResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: List all lecturers
@@ -945,16 +705,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Create lecturer profile
       tags:
-      - Lecturer
+      - Lecturers
   /lecturers/{id}:
     put:
       consumes:
@@ -982,16 +744,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Update lecturer profile
       tags:
-      - Lecturer
+      - Lecturers
   /lecturers/{id}/advisees:
     get:
       description: Get list of students guided by a lecturer
@@ -1007,25 +771,49 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.StudentListResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get lecturer's advisees
       tags:
       - Lecturers
+  /reports/statistics:
+    get:
+      description: Get comprehensive statistics of achievements based on user role
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Get achievement statistics
+      tags:
+      - Reports
   /reports/student/{id}:
     get:
-      description: Get all achievements for a specific student (Admin)
+      description: Get comprehensive achievement report for a specific student
       parameters:
-      - description: Student ID
+      - description: Student User ID (UUID)
         in: path
         name: id
         required: true
@@ -1036,18 +824,26 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AchievementListResponse'
-        "404":
-          description: Not Found
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
-      summary: Get student achievements
+      summary: Get student achievement report
       tags:
       - Reports
   /students:
@@ -1059,11 +855,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.StudentListResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: List all students
@@ -1090,16 +888,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Create student profile
       tags:
-      - Student
+      - Students
   /students/{id}:
     get:
       description: Get detailed information of a student
@@ -1119,11 +919,13 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get student detail
@@ -1155,16 +957,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Update student profile
       tags:
-      - Student
+      - Students
   /students/{id}/achievements:
     get:
       description: Get all achievements for a specific student
@@ -1180,15 +984,18 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AchievementListResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Get student achievements
@@ -1210,27 +1017,177 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.MessageResponse'
+          additionalProperties: true
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Set student advisor
       tags:
-      - Student
+      - Students
+  /users:
+    get:
+      description: Get paginated list of all users
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserResponse'
+            type: array
+      security:
+      - Bearer: []
+      summary: List users
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: User data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Create user
+      tags:
+      - Users
+  /users/{id}:
+    delete:
+      description: Permanently delete a user account (hard delete)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Delete user
+      tags:
+      - Users
+    get:
+      description: Retrieve a specific user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Get user by ID
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Update user information
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated user data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Update user
+      tags:
+      - Users
   /users/{id}/role:
     put:
       consumes:
@@ -1247,26 +1204,31 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.MessageResponse'
+          additionalProperties: true
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.MessageResponse'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            additionalProperties: true
+            type: object
       security:
       - Bearer: []
       summary: Update user role
@@ -1276,8 +1238,8 @@ schemes:
 - http
 - https
 securityDefinitions:
-  BearerAuth:
-    description: Type "Bearer" followed by a space and JWT token.
+  Bearer:
+    description: 'Enter your JWT token in the format: Bearer {token}'
     in: header
     name: Authorization
     type: apiKey

@@ -48,13 +48,13 @@ func NewUserService() UserService {
 // CreateUser handles user creation
 // @Summary Create user
 // @Description Create a new user account
-// @Tags User
+// @Tags Users
 // @Accept json
 // @Produce json
 // @Param body body models.CreateUserRequest true "User data"
 // @Success 201 {object} models.UserResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Router /admin/users [post]
+// @Failure 400 {object} map[string]interface{}
+// @Router /users [post]
 // @Security Bearer
 func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
 	var req models.CreateUserRequest
@@ -122,15 +122,15 @@ func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
 // UpdateUser handles user update
 // @Summary Update user
 // @Description Update user information
-// @Tags User
+// @Tags Users
 // @Accept json
 // @Produce json
 // @Param id path string true "User ID"
 // @Param body body models.UpdateUserRequest true "Updated user data"
 // @Success 200 {object} models.UserResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /admin/users/{id} [put]
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /users/{id} [put]
 // @Security Bearer
 func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
 	var req models.UpdateUserRequest
@@ -187,16 +187,19 @@ func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
 
 // DeleteUser handles user deletion
 // @Summary Delete user
-// @Description Soft delete a user account
-// @Tags User
+// @Description Permanently delete a user account (hard delete)
+// @Tags Users
 // @Produce json
 // @Param id path string true "User ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /admin/users/{id} [delete]
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /users/{id} [delete]
 // @Security Bearer
 func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
-	user, err := s.userRepo.FindByID(c.Params("id"))
+	userID := c.Params("id")
+
+	// Check if user exists first
+	_, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.ErrorResponse(c, fiber.StatusNotFound, "user not found")
@@ -204,25 +207,23 @@ func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to find user")
 	}
 
-	user.IsActive = false
-	user.UpdatedAt = time.Now()
-
-	if err := s.userRepo.Update(user); err != nil {
+	// Hard delete the user
+	if err := s.userRepo.Delete(userID); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete user")
 	}
 
-	return utils.DeletedResponse(c, "user deleted successfully")
+	return utils.DeletedResponse(c, "user permanently deleted successfully")
 }
 
 // GetUserByID handles getting single user
 // @Summary Get user by ID
 // @Description Retrieve a specific user by ID
-// @Tags User
+// @Tags Users
 // @Produce json
 // @Param id path string true "User ID"
 // @Success 200 {object} models.UserResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /admin/users/{id} [get]
+// @Failure 404 {object} map[string]interface{}
+// @Router /users/{id} [get]
 // @Security Bearer
 func (s *userServiceImpl) GetUserByID(c *fiber.Ctx) error {
 	user, err := s.userRepo.FindByID(c.Params("id"))
@@ -248,12 +249,12 @@ func (s *userServiceImpl) GetUserByID(c *fiber.Ctx) error {
 // ListUsers handles listing users
 // @Summary List users
 // @Description Get paginated list of all users
-// @Tags User
+// @Tags Users
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
 // @Success 200 {array} models.UserResponse
-// @Router /admin/users [get]
+// @Router /users [get]
 // @Security Bearer
 func (s *userServiceImpl) ListUsers(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
@@ -279,15 +280,8 @@ func (s *userServiceImpl) ListUsers(c *fiber.Ctx) error {
 	return utils.PaginatedResponse(c, fiber.Map{"users": responses}, total, pagination.Page, pagination.Limit)
 }
 
-// GetAllAchievements handles getting all achievements
-// @Summary Get all achievements
-// @Description Get all achievements from all users (admin only)
-// @Tags User
-// @Produce json
-// @Success 200 {array} models.AchievementReference
-// @Failure 403 {object} models.ErrorResponse
-// @Router /admin/achievements [get]
-// @Security Bearer
+// GetAllAchievements handles getting all achievements (Admin only)
+// This endpoint is documented in achievement_service.go as GET /achievements
 func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
 	achievements, total, err := s.achievementRepo.FindAllWithPagination(pagination.Page, pagination.Limit)
@@ -320,15 +314,8 @@ func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	return utils.PaginatedResponse(c, fiber.Map{"achievements": results}, total, pagination.Page, pagination.Limit)
 }
 
-// GetAchievementStats handles getting achievement statistics
-// @Summary Get achievement statistics
-// @Description Get overall achievement statistics (admin only)
-// @Tags User
-// @Produce json
-// @Success 200 {object} models.StatisticsResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Router /admin/achievements/stats [get]
-// @Security Bearer
+// GetAchievementStats handles getting achievement statistics (Admin only)
+// This endpoint is documented in achievement_service.go as GET /achievements/stats
 func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
 	stats := make(map[string]interface{})
 
@@ -362,11 +349,11 @@ func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "User ID"
-// @Param body body models.MessageResponse true "Role data"
-// @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Param body body map[string]interface{} true "Role data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /users/{id}/role [put]
 // @Security Bearer
 func (s *userServiceImpl) UpdateUserRole(c *fiber.Ctx) error {
@@ -405,17 +392,7 @@ func (s *userServiceImpl) UpdateUserRole(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "user role updated successfully", nil)
 }
 
-// GetStudentAchievements handles getting achievements for a specific student
-// @Summary Get student achievements
-// @Description Get all achievements for a specific student (Admin)
-// @Tags Reports
-// @Produce json
-// @Param id path string true "Student ID"
-// @Success 200 {object} models.AchievementListResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
-// @Router /reports/student/{id} [get]
-// @Security Bearer
+// GetStudentAchievements handles getting achievements for a specific student (not used in routes)
 func (s *userServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 

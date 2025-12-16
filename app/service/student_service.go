@@ -43,13 +43,13 @@ func NewStudentService() StudentService {
 // CreateStudentProfile handles creating student profile
 // @Summary Create student profile
 // @Description Create a new student profile for a user
-// @Tags Student
+// @Tags Students
 // @Accept json
 // @Produce json
 // @Param body body models.Student true "Student data"
 // @Success 201 {object} models.Student
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /students [post]
 // @Security Bearer
 func (s *studentServiceImpl) CreateStudentProfile(c *fiber.Ctx) error {
@@ -108,14 +108,14 @@ func (s *studentServiceImpl) CreateStudentProfile(c *fiber.Ctx) error {
 // UpdateStudentProfile handles updating student profile
 // @Summary Update student profile
 // @Description Update an existing student profile
-// @Tags Student
+// @Tags Students
 // @Accept json
 // @Produce json
 // @Param id path string true "Student ID"
 // @Param body body models.Student true "Student data"
 // @Success 200 {object} models.Student
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /students/{id} [put]
 // @Security Bearer
 func (s *studentServiceImpl) UpdateStudentProfile(c *fiber.Ctx) error {
@@ -158,14 +158,14 @@ func (s *studentServiceImpl) UpdateStudentProfile(c *fiber.Ctx) error {
 // SetAdvisor handles setting student advisor
 // @Summary Set student advisor
 // @Description Assign a lecturer as advisor for a student
-// @Tags Student
+// @Tags Students
 // @Accept json
 // @Produce json
 // @Param id path string true "Student UUID ID (from database, not NIM)"
-// @Param body body models.MessageResponse true "Advisor user ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Param body body map[string]interface{} true "Advisor user ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /students/{id}/advisor [put]
 // @Security Bearer
 func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
@@ -233,8 +233,8 @@ func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
 // @Description Get paginated list of all students
 // @Tags Students
 // @Produce json
-// @Success 200 {object} models.StudentListResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /students [get]
 // @Security Bearer
 func (s *studentServiceImpl) ListStudents(c *fiber.Ctx) error {
@@ -250,8 +250,8 @@ func (s *studentServiceImpl) ListStudents(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Student ID"
 // @Success 200 {object} models.Student
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /students/{id} [get]
 // @Security Bearer
 func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
@@ -274,9 +274,9 @@ func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
 // @Tags Students
 // @Produce json
 // @Param id path string true "Student ID"
-// @Success 200 {object} models.AchievementListResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /students/{id}/achievements [get]
 // @Security Bearer
 func (s *studentServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {

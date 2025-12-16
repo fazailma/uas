@@ -103,3 +103,8 @@ func (r *UserRepository) FindAll(page, pageSize int) ([]*models.User, int64, err
 
 	return users, total, nil
 }
+
+// Delete permanently deletes a user record (hard delete)
+func (r *UserRepository) Delete(userID string) error {
+	return database.DB.Unscoped().Delete(&models.User{}, "id = ?", userID).Error
+}

@@ -43,8 +43,8 @@ func NewAuthService() AuthService {
 // @Accept json
 // @Produce json
 // @Param body body models.LoginCredential true "Login credentials"
-// @Success 200 {object} models.LoginResponse "token and user data"
-// @Failure 401 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{} "token and user data"
+// @Failure 401 {object} map[string]interface{}
 // @Router /auth/login [post]
 func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 	var req models.LoginCredential
@@ -177,27 +177,103 @@ func (s *authServiceImpl) Register(c *fiber.Ctx) error {
 }
 
 // Logout handler
+// @Summary User logout
+// @Description Logout user (client should delete tokens)
+// @Tags Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /auth/logout [post]
 func (s *authServiceImpl) Logout(c *fiber.Ctx) error {
-	return utils.SuccessResponse(c, "logout successful", nil)
+	// With short-lived tokens, logout is handled client-side
+	// Client should delete both access_token and refresh_token from storage
+	return utils.SuccessResponse(c, "logout successful - please delete your tokens from client storage", fiber.Map{
+		"instruction": "Delete access_token and refresh_token from your client storage (localStorage, cookies, etc.)",
+	})
 }
 
 // RefreshToken handler
+// @Summary Refresh access token
+// @Description Generate new access token using refresh token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body object{refresh_token=string} true "Refresh token"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /auth/refresh [post]
 func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 	var req struct {
-		Token string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Token == "" {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "token is required")
+	if req.RefreshToken == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "refresh_token is required")
 	}
 
-	return utils.SuccessResponse(c, "token refreshed", fiber.Map{"token": "new-token-here"})
+	// Validate refresh token
+	user, err := utils.ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid or expired refresh token")
+	}
+
+	// Get full user data with role and permissions
+	fullUser, err := s.userRepo.FindByID(user.ID)
+	if err != nil || !fullUser.IsActive {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "user not found or inactive")
+	}
+
+	userWithPerms, permissions, err := s.userRepo.GetUserWithRoleAndPermissions(fullUser.ID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user permissions")
+	}
+
+	var role models.Role
+	if userWithPerms.RoleID != "" {
+		if err := database.DB.Where("id = ?", userWithPerms.RoleID).First(&role).Error; err != nil {
+			role.Name = ""
+		}
+	}
+
+	permissionNames := make([]string, len(permissions))
+	for i, p := range permissions {
+		permissionNames[i] = p.Name
+	}
+
+	// Generate new access token
+	newAccessToken, err := utils.GenerateJWT(userWithPerms, role, permissionNames)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate access token")
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := utils.GenerateRefreshToken(userWithPerms)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate refresh token")
+	}
+
+	return utils.SuccessResponse(c, "tokens refreshed successfully", fiber.Map{
+		"access_token":  newAccessToken,
+		"refresh_token": newRefreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    900, // 15 minutes in seconds
+	})
 }
 
 // GetProfile handler
+// @Summary Get user profile
+// @Description Get current authenticated user profile
+// @Tags Auth
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /auth/profile [get]
+// @Security Bearer
 func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "profile retrieved", fiber.Map{
 		"user_id":     c.Locals("user_id"),

@@ -44,13 +44,13 @@ func NewLecturerService() LecturerService {
 // CreateLecturerProfile handles creating lecturer profile
 // @Summary Create lecturer profile
 // @Description Create a new lecturer profile for a user
-// @Tags Lecturer
+// @Tags Lecturers
 // @Accept json
 // @Produce json
 // @Param body body models.Lecturer true "Lecturer data"
 // @Success 201 {object} models.Lecturer
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /lecturers [post]
 // @Security Bearer
 func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
@@ -108,14 +108,14 @@ func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
 // UpdateLecturerProfile handles updating lecturer profile
 // @Summary Update lecturer profile
 // @Description Update an existing lecturer profile
-// @Tags Lecturer
+// @Tags Lecturers
 // @Accept json
 // @Produce json
 // @Param id path string true "Lecturer ID"
 // @Param body body models.Lecturer true "Lecturer data"
 // @Success 200 {object} models.Lecturer
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /lecturers/{id} [put]
 // @Security Bearer
 func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
@@ -147,17 +147,8 @@ func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "lecturer profile updated successfully", lecturer)
 }
 
-// VerifyAchievement handles achievement verification
-// @Summary Verify achievement
-// @Description Verify a submitted achievement (Dosen Wali only)
-// @Tags Lecturer
-// @Produce json
-// @Param id path string true "Achievement ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /lecturer/achievements/{id}/verify [post]
-// @Security Bearer
+// VerifyAchievement handles achievement verification (Dosen Wali only)
+// This endpoint is documented in achievement_service.go as /achievements/{id}/verify
 func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	if c.Locals("role") != "Dosen Wali" {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "only dosen wali can verify achievements")
@@ -196,19 +187,8 @@ func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "Prestasi berhasil diverifikasi", fiber.Map{"id": achievementID, "status": "verified"})
 }
 
-// RejectAchievement handles achievement rejection
-// @Summary Reject achievement
-// @Description Reject a submitted achievement (Dosen Wali only)
-// @Tags Lecturer
-// @Accept json
-// @Produce json
-// @Param id path string true "Achievement ID"
-// @Param body body models.MessageResponse true "Rejection note"
-// @Success 200 {object} models.MessageResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Router /lecturer/achievements/{id}/reject [post]
-// @Security Bearer
+// RejectAchievement handles achievement rejection (Dosen Wali only)
+// This endpoint is documented in achievement_service.go as /achievements/{id}/reject
 func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	if c.Locals("role") != "Dosen Wali" {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "only dosen wali can reject achievements")
@@ -242,11 +222,11 @@ func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // GetGuidedStudentsAchievements handles getting guided students achievements
 // @Summary Get guided students achievements
 // @Description Get all achievements of students guided by current lecturer
-// @Tags Lecturer
+// @Tags Lecturers
 // @Produce json
 // @Success 200 {array} models.AchievementReference
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Failure 403 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /lecturer/achievements [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error {
@@ -317,8 +297,8 @@ func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error 
 // @Description Get paginated list of all lecturers
 // @Tags Lecturers
 // @Produce json
-// @Success 200 {object} models.LecturerListResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /lecturers [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) ListLecturers(c *fiber.Ctx) error {
@@ -338,9 +318,9 @@ func (s *lecturerServiceImpl) ListLecturers(c *fiber.Ctx) error {
 // @Tags Lecturers
 // @Produce json
 // @Param id path string true "Lecturer ID"
-// @Success 200 {object} models.StudentListResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /lecturers/{id}/advisees [get]
 // @Security Bearer
 func (s *lecturerServiceImpl) GetAdvisees(c *fiber.Ctx) error {

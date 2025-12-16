@@ -54,8 +54,8 @@ func NewAchievementService() AchievementService {
 // @Produce json
 // @Param body body models.CreateAchievementRequest true "Achievement data"
 // @Success 201 {object} models.AchievementReference
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
 // @Router /achievements [post]
 // @Security Bearer
 func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
@@ -113,7 +113,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Success 200 {array} models.AchievementReference
-// @Failure 500 {object} models.ErrorResponse
+// @Failure 500 {object} map[string]interface{}
 // @Router /achievements [get]
 // @Security Bearer
 func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
@@ -296,8 +296,8 @@ func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Achievement ID"
 // @Success 200 {object} models.AchievementReference
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
 // @Router /achievements/{id} [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
@@ -323,9 +323,9 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 // @Param id path string true "Achievement ID"
 // @Param body body models.UpdateAchievementRequest true "Updated achievement data"
 // @Success 200 {object} models.AchievementReference
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /achievements/{id} [put]
 // @Security Bearer
 func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
@@ -376,10 +376,10 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /achievements/{id} [delete]
 // @Security Bearer
 func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
@@ -416,10 +416,10 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /achievements/{id}/submit [post]
 // @Security Bearer
 func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
@@ -449,9 +449,9 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 // @Tags Achievements
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Router /achievements/{id}/history [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
@@ -506,11 +506,11 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 // GetStatistics handles getting achievement statistics
 // @Summary Get achievement statistics
 // @Description Get comprehensive statistics of achievements based on user role
-// @Tags Achievements
+// @Tags Reports
 // @Produce json
-// @Success 200 {object} models.StatisticsResponse
-// @Failure 500 {object} models.ErrorResponse
-// @Router /achievements/stats [get]
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /reports/statistics [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetStatistics(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
@@ -664,9 +664,9 @@ func (s *achievementServiceImpl) buildStatistics(ctx context.Context, achievemen
 // @Accept json
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Success 200 {object} models.MessageResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /achievements/{id}/verify [post]
 // @Security Bearer
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
@@ -714,10 +714,10 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Achievement ID"
-// @Param body body models.MessageResponse true "Rejection data"
-// @Success 200 {object} models.MessageResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Param body body map[string]interface{} true "Rejection data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /achievements/{id}/reject [post]
 // @Security Bearer
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
@@ -774,10 +774,10 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Achievement ID"
 // @Param file formData file true "File to upload"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 404 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /achievements/{id}/attachments [post]
 // @Security Bearer
 func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
@@ -879,10 +879,10 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 // @Tags Reports
 // @Produce json
 // @Param id path string true "Student User ID (UUID)"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 403 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /reports/student/{id} [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetStudentReport(c *fiber.Ctx) error {
