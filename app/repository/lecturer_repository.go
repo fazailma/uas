@@ -61,3 +61,13 @@ func (r *LecturerRepository) CountTotal() (int64, error) {
 	err := database.DB.Model(&models.Lecturer{}).Count(&count).Error
 	return count, err
 }
+
+// FindByID finds lecturer by ID
+func (r *LecturerRepository) FindByID(id string) (*models.Lecturer, error) {
+	var lecturer models.Lecturer
+	err := database.DB.Where("id = ?", id).First(&lecturer).Error
+	if err != nil {
+		return nil, err
+	}
+	return &lecturer, nil
+}

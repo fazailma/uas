@@ -849,6 +849,17 @@ paths:
   /students:
     get:
       description: Get paginated list of all students
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:

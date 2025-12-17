@@ -31,18 +31,20 @@ type AchievementService interface {
 }
 
 type achievementServiceImpl struct {
-	pgRepo      *repository.AchievementRepository
-	mongoRepo   *repository.MongoAchievementRepository
-	studentRepo *repository.StudentRepository
-	userRepo    *repository.UserRepository
+	pgRepo       *repository.AchievementRepository
+	mongoRepo    *repository.MongoAchievementRepository
+	studentRepo  *repository.StudentRepository
+	userRepo     *repository.UserRepository
+	lecturerRepo *repository.LecturerRepository
 }
 
 func NewAchievementService() AchievementService {
 	return &achievementServiceImpl{
-		pgRepo:      repository.NewAchievementRepository(),
-		mongoRepo:   repository.NewMongoAchievementRepository(),
-		studentRepo: repository.NewStudentRepository(),
-		userRepo:    repository.NewUserRepository(),
+		pgRepo:       repository.NewAchievementRepository(),
+		mongoRepo:    repository.NewMongoAchievementRepository(),
+		studentRepo:  repository.NewStudentRepository(),
+		userRepo:     repository.NewUserRepository(),
+		lecturerRepo: repository.NewLecturerRepository(),
 	}
 }
 
@@ -76,7 +78,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	defer cancel()
 
 	mongoAch, err := s.mongoRepo.Create(ctx, &models.MongoAchievement{
-		StudentID:       c.Locals("user_id").(string),
+		StudentID:       c.Locals("userID").(string),
 		Title:           req.Title,
 		Description:     req.Description,
 		AchievementType: req.AchievementType,
@@ -92,7 +94,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 
 	pgAch := &models.AchievementReference{
 		ID:                 uuid.New().String(),
-		StudentID:          c.Locals("user_id").(string),
+		StudentID:          c.Locals("userID").(string),
 		MongoAchievementID: mongoAch.ID.Hex(),
 		Status:             "draft",
 		CreatedAt:          time.Now(),
@@ -117,7 +119,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 // @Router /achievements [get]
 // @Security Bearer
 func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
+	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
 
 	// Get query parameters for filtering, sorting, and pagination
@@ -307,8 +309,31 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 	}
 
 	role := c.Locals("role").(string)
-	if role == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	userID := c.Locals("userID").(string)
+
+	// Mahasiswa can only view their own achievements
+	if role == "Mahasiswa" && achievement.StudentID != userID {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only view your own achievements")
+	}
+
+	// Dosen Wali can only view achievements of their advisees
+	if role == "Dosen Wali" {
+		// Get student info
+		student, err := s.studentRepo.FindByUserID(achievement.StudentID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get student info")
+		}
+
+		// Get lecturer info
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "lecturer profile not found")
+		}
+
+		// Check if this lecturer is the advisor
+		if student.AdvisorID != lecturer.ID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only view achievements of your advisees")
+		}
 	}
 
 	return utils.SuccessResponse(c, "achievement detail retrieved", achievement)
@@ -339,7 +364,7 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
 	}
 
-	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("userID").(string) {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only update your own achievements")
 	}
 
@@ -351,7 +376,7 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	defer cancel()
 
 	if _, err := s.mongoRepo.Update(ctx, achievement.MongoAchievementID, &models.MongoAchievement{
-		StudentID:       c.Locals("user_id").(string),
+		StudentID:       c.Locals("userID").(string),
 		Title:           req.Title,
 		Description:     req.Description,
 		AchievementType: req.AchievementType,
@@ -388,7 +413,7 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
 	}
 
-	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("userID").(string) {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only delete your own achievements")
 	}
 
@@ -428,7 +453,7 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
 	}
 
-	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("userID").(string) {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only submit your own achievements")
 	}
 
@@ -460,7 +485,7 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement not found")
 	}
 
-	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("userID").(string) {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only view your own achievement history")
 	}
 
@@ -513,7 +538,7 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 // @Router /reports/statistics [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetStatistics(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
+	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
 
 	var achievements []models.AchievementReference
@@ -671,7 +696,7 @@ func (s *achievementServiceImpl) buildStatistics(ctx context.Context, achievemen
 // @Security Bearer
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	dosenID := c.Locals("user_id").(string)
+	dosenID := c.Locals("userID").(string)
 
 	// Get achievement first to update it properly
 	achievement, err := s.pgRepo.FindByID(achievementID)
@@ -722,7 +747,7 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Security Bearer
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	dosenID := c.Locals("user_id").(string)
+	dosenID := c.Locals("userID").(string)
 
 	var req struct {
 		RejectionNote string `json:"rejection_note" validate:"required"`
@@ -807,7 +832,7 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 	}
 
 	// Verify ownership
-	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("user_id").(string) {
+	if c.Locals("role") == "Mahasiswa" && achievement.StudentID != c.Locals("userID").(string) {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only upload attachments to your own achievements")
 	}
 
@@ -886,7 +911,7 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 // @Router /reports/student/{id} [get]
 // @Security Bearer
 func (s *achievementServiceImpl) GetStudentReport(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
+	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
 	studentUserID := c.Params("id") // This is the User ID of the student
 

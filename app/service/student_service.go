@@ -162,7 +162,7 @@ func (s *studentServiceImpl) UpdateStudentProfile(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Student UUID ID (from database, not NIM)"
-// @Param body body map[string]interface{} true "Advisor user ID"
+// @Param body body map[string]interface{} true "Advisor lecturer ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
@@ -192,22 +192,29 @@ func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to find student")
 	}
 
-	advisor, err := s.userRepo.FindByID(req.AdvisorID)
+	// Try to find lecturer by ID first, then by UserID for flexibility
+	var lecturer *models.Lecturer
+	lecturer, err = s.lecturerRepo.FindByID(req.AdvisorID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrorResponse(c, fiber.StatusNotFound, "advisor user ID not found in database: "+req.AdvisorID+". Make sure user Dosen was created correctly with POST /api/v1/users")
+		// Try finding by UserID as fallback
+		lecturer, err = s.lecturerRepo.FindByUserID(req.AdvisorID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found with ID: "+req.AdvisorID)
+			}
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error finding lecturer: "+err.Error())
 		}
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error finding advisor: "+err.Error())
 	}
 
-	// Verify advisor has a RoleID
-	if advisor.RoleID == "" {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "advisor user found but has no role assigned")
+	// Verify the user associated with this lecturer has Dosen/Dosen Wali role
+	advisor, err := s.userRepo.FindByID(lecturer.UserID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get lecturer user info")
 	}
 
 	role, err := s.roleRepo.FindByID(advisor.RoleID)
 	if err != nil || role == nil {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "role not found for advisor")
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "role not found for lecturer")
 	}
 
 	// Check if advisor has Dosen role (flexible matching)
@@ -218,34 +225,113 @@ func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "advisor must have Dosen/Lecturer role, current role: "+role.Name)
 	}
 
-	student.AdvisorID = req.AdvisorID
+	// Set advisor_id to lecturer.ID (not user_id)
+	student.AdvisorID = lecturer.ID
 	student.UpdatedAt = time.Now()
 
 	if err := s.studentRepo.Update(studentUUID, student); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to set advisor")
 	}
 
-	return utils.SuccessResponse(c, "advisor set successfully", nil)
+	return utils.SuccessResponse(c, "advisor set successfully", fiber.Map{
+		"student_id":   student.ID,
+		"advisor_id":   lecturer.ID,
+		"advisor_name": advisor.FullName,
+		"advisor_nip":  lecturer.LecturerID,
+	})
 }
 
 // ListStudents handles listing all students
 // @Summary List all students
-// @Description Get paginated list of all students
+// @Description Get paginated list of all students. Dosen Wali only sees their advisees.
 // @Tags Students
 // @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /students [get]
 // @Security Bearer
 func (s *studentServiceImpl) ListStudents(c *fiber.Ctx) error {
-	// For now, get all students without pagination
-	// TODO: Implement pagination in StudentRepository
-	return utils.ErrorResponse(c, fiber.StatusNotImplemented, "list students not yet implemented")
+	// Get logged in user
+	userIDInterface := c.Locals("userID")
+	if userIDInterface == nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "user not authenticated")
+	}
+	userID := userIDInterface.(string)
+	loggedInUser, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user info")
+	}
+
+	// Get user role
+	role, err := s.roleRepo.FindByID(loggedInUser.RoleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user role")
+	}
+
+	// Fetch students based on role
+	var students []models.Student
+	if role.Name == "Dosen Wali" {
+		// Dosen Wali can only see their advisees
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "lecturer profile not found")
+		}
+		students, err = s.studentRepo.FindByAdvisorID(lecturer.ID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch advisees")
+		}
+	} else {
+		// Admin and others can see all students
+		students, err = s.studentRepo.FindAll()
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch students")
+		}
+	}
+
+	// Enrich with user data
+	var results []fiber.Map
+	for _, student := range students {
+		user, err := s.userRepo.FindByID(student.UserID)
+		if err != nil {
+			continue
+		}
+
+		// Get advisor name if exists
+		advisorName := "-" // Default jika belum ada advisor
+		if student.AdvisorID != "" && student.AdvisorID != "null" {
+			advisor, err := s.lecturerRepo.FindByID(student.AdvisorID)
+			if err == nil && advisor != nil {
+				advisorUser, err := s.userRepo.FindByID(advisor.UserID)
+				if err == nil && advisorUser != nil {
+					advisorName = advisorUser.FullName
+				}
+			}
+		}
+
+		results = append(results, fiber.Map{
+			"id":            student.ID,
+			"user_id":       student.UserID,
+			"student_id":    student.StudentID,
+			"full_name":     user.FullName,
+			"email":         user.Email,
+			"program_study": student.ProgramStudy,
+			"academic_year": student.AcademicYear,
+			"advisor_id":    student.AdvisorID,
+			"advisor_name":  advisorName,
+		})
+	}
+
+	return utils.SuccessResponse(c, "students retrieved successfully", fiber.Map{
+		"students": results,
+		"total":    len(results),
+	})
 }
 
 // GetStudent handles getting student detail
 // @Summary Get student detail
-// @Description Get detailed information of a student
+// @Description Get detailed information of a student. Dosen Wali can only access their advisees.
 // @Tags Students
 // @Produce json
 // @Param id path string true "Student ID"
@@ -255,14 +341,46 @@ func (s *studentServiceImpl) ListStudents(c *fiber.Ctx) error {
 // @Router /students/{id} [get]
 // @Security Bearer
 func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
-	studentID := c.Params("id")
+	id := c.Params("id")
 
-	student, err := s.studentRepo.FindByUserID(studentID)
+	// Try to find by ID first, then by UserID
+	student, err := s.studentRepo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+		// Try finding by UserID
+		student, err = s.studentRepo.FindByUserID(id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+			}
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get student")
 		}
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get student")
+	}
+
+	// Check ownership for Dosen Wali
+	userIDInterface := c.Locals("userID")
+	if userIDInterface == nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "user not authenticated")
+	}
+	userID := userIDInterface.(string)
+	loggedInUser, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user info")
+	}
+
+	role, err := s.roleRepo.FindByID(loggedInUser.RoleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user role")
+	}
+
+	// If Dosen Wali, verify ownership
+	if role.Name == "Dosen Wali" {
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "lecturer profile not found")
+		}
+		if student.AdvisorID != lecturer.ID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only access your own advisees")
+		}
 	}
 
 	return utils.SuccessResponse(c, "student retrieved successfully", student)
@@ -270,7 +388,7 @@ func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
 
 // GetStudentAchievements handles getting student achievements
 // @Summary Get student achievements
-// @Description Get all achievements for a specific student
+// @Description Get all achievements for a specific student. Dosen Wali can only access their advisees' achievements.
 // @Tags Students
 // @Produce json
 // @Param id path string true "Student ID"
@@ -280,21 +398,52 @@ func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
 // @Router /students/{id}/achievements [get]
 // @Security Bearer
 func (s *studentServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
-	studentID := c.Params("id")
+	id := c.Params("id")
 
-	// Verify student exists
-	_, err := s.studentRepo.FindByUserID(studentID)
+	// Verify student exists and get user_id
+	student, err := s.studentRepo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+		// Try finding by UserID
+		student, err = s.studentRepo.FindByUserID(id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+			}
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to verify student")
 		}
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to verify student")
 	}
 
-	// Get achievements from achievement repository
-	achievementRepo := repository.NewAchievementRepository()
-	achievements, err := achievementRepo.FindByStudentID(studentID)
+	// Check ownership for Dosen Wali
+	userIDInterface := c.Locals("userID")
+	if userIDInterface == nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "user not authenticated")
+	}
+	userID := userIDInterface.(string)
+	loggedInUser, err := s.userRepo.FindByID(userID)
 	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user info")
+	}
+
+	role, err := s.roleRepo.FindByID(loggedInUser.RoleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get user role")
+	}
+
+	// If Dosen Wali, verify ownership
+	if role.Name == "Dosen Wali" {
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "lecturer profile not found")
+		}
+		if student.AdvisorID != lecturer.ID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "you can only access achievements of your own advisees")
+		}
+	}
+
+	// Get achievements from achievement repository using UserID
+	achievementRepo := repository.NewAchievementRepository()
+	achievements, errAch := achievementRepo.FindByStudentID(student.UserID)
+	if errAch != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to get student achievements")
 	}
 

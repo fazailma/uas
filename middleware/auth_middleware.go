@@ -53,7 +53,7 @@ func AuthMiddleware(c *fiber.Ctx) error {
 
 	// Store claims in locals for use in handlers
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		c.Locals("user_id", claims["user_id"])
+		c.Locals("userID", claims["user_id"])
 		c.Locals("username", claims["username"])
 		c.Locals("email", claims["email"])
 		c.Locals("role", claims["role"])

@@ -276,7 +276,7 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 // @Security Bearer
 func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "profile retrieved", fiber.Map{
-		"user_id":     c.Locals("user_id"),
+		"user_id":     c.Locals("userID"),
 		"username":    c.Locals("username"),
 		"email":       c.Locals("email"),
 		"role":        c.Locals("role"),

@@ -10,7 +10,7 @@ import (
 // Usage: app.Use(middleware.OwnershipMiddleware())
 // This middleware extracts owner_id from URL param and compares with user_id in context
 func OwnershipMiddleware(c *fiber.Ctx) error {
-	userID := c.Locals("user_id")
+	userID := c.Locals("userID")
 	if userID == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status": "forbidden",

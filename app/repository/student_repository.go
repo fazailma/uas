@@ -78,3 +78,23 @@ func (r *StudentRepository) CountByAdvisorID(advisorID string) (int64, error) {
 		Count(&count).Error
 	return count, err
 }
+
+// FindAll retrieves all students
+func (r *StudentRepository) FindAll() ([]models.Student, error) {
+	var students []models.Student
+	err := database.DB.Find(&students).Error
+	if err != nil {
+		return nil, err
+	}
+	return students, nil
+}
+
+// FindByID finds student by ID
+func (r *StudentRepository) FindByID(id string) (*models.Student, error) {
+	var student models.Student
+	err := database.DB.Where("id = ?", id).First(&student).Error
+	if err != nil {
+		return nil, err
+	}
+	return &student, nil
+}
