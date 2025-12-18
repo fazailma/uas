@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -48,7 +49,7 @@ func NewAchievementService() AchievementService {
 	}
 }
 
-// CreateAchievement handles achievement creation
+// FunctionName godoc
 // @Summary Create new achievement
 // @Description Create a new achievement for the logged-in student
 // @Tags Achievements
@@ -65,7 +66,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
-
+	
 	if req.Title == "" || req.AchievementType == "" {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "title and achievement_type are required")
 	}
@@ -84,7 +85,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 		AchievementType: req.AchievementType,
 		Details:         req.Details,
 		Tags:            req.Tags,
-		Points:          req.Points,
+		Points:          0,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 	})
@@ -109,7 +110,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	return utils.CreatedResponse(c, "Prestasi berhasil dibuat", pgAch)
 }
 
-// ListAchievements handles listing achievements
+// FunctionName godoc
 // @Summary List achievements
 // @Description Get list of achievements based on user role
 // @Tags Achievements
@@ -291,7 +292,7 @@ func (s *achievementServiceImpl) ListAchievements(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
-// GetAchievementDetail handles getting achievement detail
+// FunctionName godoc
 // @Summary Get achievement detail
 // @Description Retrieve detailed information of a specific achievement
 // @Tags Achievements
@@ -339,7 +340,7 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "achievement detail retrieved", achievement)
 }
 
-// UpdateAchievement handles updating achievement
+// FunctionName godoc
 // @Summary Update achievement
 // @Description Update an existing achievement (only draft status)
 // @Tags Achievements
@@ -382,7 +383,7 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 		AchievementType: req.AchievementType,
 		Details:         req.Details,
 		Tags:            req.Tags,
-		Points:          req.Points,
+		Points:          0,
 	}); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update achievement")
 	}
@@ -395,7 +396,7 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "Prestasi berhasil diperbarui", achievement)
 }
 
-// DeleteAchievement handles deleting achievement
+// FunctionName godoc
 // @Summary Delete achievement
 // @Description Delete an achievement (only draft status)
 // @Tags Achievements
@@ -435,7 +436,7 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	return utils.DeletedResponse(c, "Prestasi berhasil dihapus")
 }
 
-// SubmitAchievement handles submitting achievement for verification
+// FunctionName godoc
 // @Summary Submit achievement
 // @Description Submit an achievement for verification (changes status from draft to submitted)
 // @Tags Achievements
@@ -468,7 +469,7 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "Prestasi berhasil disubmit untuk verifikasi", fiber.Map{"id": c.Params("id"), "status": "submitted"})
 }
 
-// GetAchievementHistory handles getting achievement history
+// FunctionName godoc
 // @Summary Get achievement history
 // @Description Get the timeline/history of an achievement's status changes
 // @Tags Achievements
@@ -528,7 +529,7 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 	})
 }
 
-// GetStatistics handles getting achievement statistics
+// FunctionName godoc
 // @Summary Get achievement statistics
 // @Description Get comprehensive statistics of achievements based on user role
 // @Tags Reports
@@ -682,7 +683,7 @@ func (s *achievementServiceImpl) buildStatistics(ctx context.Context, achievemen
 	}
 }
 
-// VerifyAchievement handles achievement verification by lecturer
+// FunctionName godoc
 // @Summary Verify achievement
 // @Description Verify an achievement submission (Dosen Wali only)
 // @Tags Achievements
@@ -715,8 +716,32 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
 	}
 
-	if student.AdvisorID != dosenID {
+	// Get lecturer info to get lecturer ID
+	lecturer, err := s.lecturerRepo.FindByUserID(dosenID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
+	}
+
+	if student.AdvisorID != lecturer.ID {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can verify achievements")
+	}
+
+	// Parse points from request body - accept both string and int
+	var reqBody map[string]interface{}
+	c.BodyParser(&reqBody) // ignore error, default to 0
+
+	points := 0
+	if p, ok := reqBody["points"]; ok {
+		switch v := p.(type) {
+		case float64:
+			points = int(v)
+		case string:
+			if val, err := strconv.Atoi(v); err == nil {
+				points = val
+			}
+		case int:
+			points = v
+		}
 	}
 
 	// Update achievement status, verified_at, and verified_by
@@ -729,10 +754,24 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to verify achievement")
 	}
 
+	// Update points in MongoDB
+	ctx := context.Background()
+	mongoAch, err := s.mongoRepo.FindByID(ctx, achievement.MongoAchievementID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "achievement details not found in MongoDB")
+	}
+
+	mongoAch.Points = points
+	mongoAch.UpdatedAt = time.Now()
+
+	if _, err := s.mongoRepo.Update(ctx, achievement.MongoAchievementID, mongoAch); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update achievement points")
+	}
+
 	return utils.SuccessResponse(c, "achievement verified successfully", nil)
 }
 
-// RejectAchievement handles achievement rejection by lecturer
+// FunctionName godoc
 // @Summary Reject achievement
 // @Description Reject an achievement submission with notes (Dosen Wali only)
 // @Tags Achievements
@@ -773,7 +812,13 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
 	}
 
-	if student.AdvisorID != dosenID {
+	// Get lecturer info to get lecturer ID
+	lecturer, err := s.lecturerRepo.FindByUserID(dosenID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
+	}
+
+	if student.AdvisorID != lecturer.ID {
 		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can reject achievements")
 	}
 
@@ -791,7 +836,7 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "achievement rejected successfully", nil)
 }
 
-// UploadAttachment handles file attachment upload for achievements
+// FunctionName godoc
 // @Summary Upload achievement attachment
 // @Description Upload proof files for an achievement
 // @Tags Achievements
@@ -898,7 +943,8 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 	})
 }
 
-// GetStudentReport handles getting detailed report of specific student's achievements
+// GetStudentReport godoc
+// FunctionName godoc
 // @Summary Get student achievement report
 // @Description Get comprehensive achievement report for a specific student
 // @Tags Reports

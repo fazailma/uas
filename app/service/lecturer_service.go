@@ -43,7 +43,7 @@ func NewLecturerService() LecturerService {
 	}
 }
 
-// CreateLecturerProfile handles creating lecturer profile
+// FunctionName godoc
 // @Summary Create lecturer profile
 // @Description Create a new lecturer profile for a user
 // @Tags Lecturers
@@ -107,7 +107,7 @@ func (s *lecturerServiceImpl) CreateLecturerProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "lecturer profile created successfully", lecturer)
 }
 
-// UpdateLecturerProfile handles updating lecturer profile
+// FunctionName godoc
 // @Summary Update lecturer profile
 // @Description Update an existing lecturer profile
 // @Tags Lecturers
@@ -149,7 +149,6 @@ func (s *lecturerServiceImpl) UpdateLecturerProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "lecturer profile updated successfully", lecturer)
 }
 
-// VerifyAchievement handles achievement verification (Dosen Wali only)
 // This endpoint is documented in achievement_service.go as /achievements/{id}/verify
 func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	if c.Locals("role") != "Dosen Wali" {
@@ -189,7 +188,6 @@ func (s *lecturerServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "Prestasi berhasil diverifikasi", fiber.Map{"id": achievementID, "status": "verified"})
 }
 
-// RejectAchievement handles achievement rejection (Dosen Wali only)
 // This endpoint is documented in achievement_service.go as /achievements/{id}/reject
 func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	if c.Locals("role") != "Dosen Wali" {
@@ -221,7 +219,7 @@ func (s *lecturerServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "Prestasi berhasil ditolak", fiber.Map{"id": achievementID, "status": "rejected"})
 }
 
-// GetGuidedStudentsAchievements handles getting guided students achievements
+// FunctionName godoc
 // @Summary Get guided students achievements
 // @Description Get all achievements of students guided by current lecturer
 // @Tags Lecturers
@@ -294,7 +292,7 @@ func (s *lecturerServiceImpl) GetGuidedStudentsAchievements(c *fiber.Ctx) error 
 	return utils.SuccessResponse(c, "guided students achievements retrieved", result)
 }
 
-// ListLecturers handles listing all lecturers
+// FunctionName godoc
 // @Summary List all lecturers
 // @Description Get paginated list of all lecturers. Dosen/Dosen Wali only sees their own profile.
 // @Tags Lecturers
@@ -343,7 +341,7 @@ func (s *lecturerServiceImpl) ListLecturers(c *fiber.Ctx) error {
 	})
 }
 
-// GetAdvisees handles getting lecturer's advisees
+// FunctionName godoc
 // @Summary Get lecturer's advisees
 // @Description Get list of students guided by a lecturer. Dosen/Dosen Wali can only access their own advisees.
 // @Tags Lecturers

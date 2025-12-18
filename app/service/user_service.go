@@ -45,7 +45,7 @@ func NewUserService() UserService {
 	}
 }
 
-// CreateUser handles user creation
+// FunctionName godoc
 // @Summary Create user
 // @Description Create a new user account
 // @Tags Users
@@ -119,7 +119,7 @@ func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateUser handles user update
+// FunctionName godoc
 // @Summary Update user
 // @Description Update user information
 // @Tags Users
@@ -185,7 +185,7 @@ func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteUser handles user deletion
+// FunctionName godoc
 // @Summary Delete user
 // @Description Permanently delete a user account (hard delete)
 // @Tags Users
@@ -215,7 +215,7 @@ func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
 	return utils.DeletedResponse(c, "user permanently deleted successfully")
 }
 
-// GetUserByID handles getting single user
+// FunctionName godoc
 // @Summary Get user by ID
 // @Description Retrieve a specific user by ID
 // @Tags Users
@@ -246,7 +246,7 @@ func (s *userServiceImpl) GetUserByID(c *fiber.Ctx) error {
 	})
 }
 
-// ListUsers handles listing users
+// FunctionName godoc
 // @Summary List users
 // @Description Get paginated list of all users
 // @Tags Users
@@ -280,7 +280,6 @@ func (s *userServiceImpl) ListUsers(c *fiber.Ctx) error {
 	return utils.PaginatedResponse(c, fiber.Map{"users": responses}, total, pagination.Page, pagination.Limit)
 }
 
-// GetAllAchievements handles getting all achievements (Admin only)
 // This endpoint is documented in achievement_service.go as GET /achievements
 func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	pagination := utils.GetPaginationParams(c)
@@ -314,7 +313,6 @@ func (s *userServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	return utils.PaginatedResponse(c, fiber.Map{"achievements": results}, total, pagination.Page, pagination.Limit)
 }
 
-// GetAchievementStats handles getting achievement statistics (Admin only)
 // This endpoint is documented in achievement_service.go as GET /achievements/stats
 func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
 	stats := make(map[string]interface{})
@@ -342,7 +340,7 @@ func (s *userServiceImpl) GetAchievementStats(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "statistics retrieved successfully", stats)
 }
 
-// UpdateUserRole handles updating user role
+// FunctionName godoc
 // @Summary Update user role
 // @Description Update role for a user (Admin only)
 // @Tags Users
@@ -392,7 +390,6 @@ func (s *userServiceImpl) UpdateUserRole(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "user role updated successfully", nil)
 }
 
-// GetStudentAchievements handles getting achievements for a specific student (not used in routes)
 func (s *userServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 

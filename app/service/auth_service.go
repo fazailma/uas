@@ -9,7 +9,6 @@ import (
 
 	"UAS/app/models"
 	"UAS/app/repository"
-	"UAS/database"
 	"UAS/utils"
 )
 
@@ -26,6 +25,7 @@ type authServiceImpl struct {
 	userRepo     *repository.UserRepository
 	studentRepo  *repository.StudentRepository
 	lecturerRepo *repository.LecturerRepository
+	roleRepo     *repository.RoleRepository
 }
 
 func NewAuthService() AuthService {
@@ -33,10 +33,11 @@ func NewAuthService() AuthService {
 		userRepo:     repository.NewUserRepository(),
 		studentRepo:  repository.NewStudentRepository(),
 		lecturerRepo: repository.NewLecturerRepository(),
+		roleRepo:     repository.NewRoleRepository(),
 	}
 }
 
-// Login handles user authentication
+// Login godoc
 // @Summary User login
 // @Description Authenticate user and return JWT token
 // @Tags Auth
@@ -72,8 +73,11 @@ func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 
 	var role models.Role
 	if userWithPerms.RoleID != "" {
-		if err := database.DB.Where("id = ?", userWithPerms.RoleID).First(&role).Error; err != nil {
+		roleData, err := s.roleRepo.FindByID(userWithPerms.RoleID)
+		if err != nil {
 			role.Name = ""
+		} else {
+			role = *roleData
 		}
 	}
 
@@ -110,7 +114,7 @@ func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "login successful", response)
 }
 
-// Register handler
+// Register godoc
 func (s *authServiceImpl) Register(c *fiber.Ctx) error {
 	var req models.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -139,10 +143,11 @@ func (s *authServiceImpl) Register(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to register user")
 	}
 
-	var role models.Role
-	if err := database.DB.Where("id = ?", user.RoleID).First(&role).Error; err != nil {
+	roleData, err := s.roleRepo.FindByID(user.RoleID)
+	if err != nil {
 		return utils.CreatedResponse(c, "user registered successfully", fiber.Map{"user_id": user.ID})
 	}
+	role := *roleData
 
 	if role.Name == "Mahasiswa" {
 		studentID := s.generateStudentID()
@@ -176,7 +181,7 @@ func (s *authServiceImpl) Register(c *fiber.Ctx) error {
 	return utils.CreatedResponse(c, "user registered successfully", fiber.Map{"user_id": user.ID})
 }
 
-// Logout handler
+// Logout godoc
 // @Summary User logout
 // @Description Logout user (client should delete tokens)
 // @Tags Auth
@@ -193,7 +198,7 @@ func (s *authServiceImpl) Logout(c *fiber.Ctx) error {
 	})
 }
 
-// RefreshToken handler
+// RefreshToken godoc
 // @Summary Refresh access token
 // @Description Generate new access token using refresh token
 // @Tags Auth
@@ -235,8 +240,11 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 
 	var role models.Role
 	if userWithPerms.RoleID != "" {
-		if err := database.DB.Where("id = ?", userWithPerms.RoleID).First(&role).Error; err != nil {
+		roleData, err := s.roleRepo.FindByID(userWithPerms.RoleID)
+		if err != nil {
 			role.Name = ""
+		} else {
+			role = *roleData
 		}
 	}
 
@@ -265,7 +273,7 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 	})
 }
 
-// GetProfile handler
+// GetProfile godoc
 // @Summary Get user profile
 // @Description Get current authenticated user profile
 // @Tags Auth

@@ -10,7 +10,6 @@ import (
 
 	"UAS/app/models"
 	"UAS/app/repository"
-	"UAS/database"
 	"UAS/utils"
 )
 
@@ -40,7 +39,7 @@ func NewStudentService() StudentService {
 	}
 }
 
-// CreateStudentProfile handles creating student profile
+// FunctionName godoc
 // @Summary Create student profile
 // @Description Create a new student profile for a user
 // @Tags Students
@@ -105,7 +104,7 @@ func (s *studentServiceImpl) CreateStudentProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "student profile created successfully", student)
 }
 
-// UpdateStudentProfile handles updating student profile
+// FunctionName godoc
 // @Summary Update student profile
 // @Description Update an existing student profile
 // @Tags Students
@@ -155,7 +154,7 @@ func (s *studentServiceImpl) UpdateStudentProfile(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "student profile updated successfully", student)
 }
 
-// SetAdvisor handles setting student advisor
+// FunctionName godoc
 // @Summary Set student advisor
 // @Description Assign a lecturer as advisor for a student
 // @Tags Students
@@ -183,8 +182,7 @@ func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
 	}
 
 	// Find student by UUID (primary key)
-	var student *models.Student
-	err := database.DB.Where("id = ?", studentUUID).First(&student).Error
+	student, err := s.studentRepo.FindByID(studentUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
@@ -241,7 +239,7 @@ func (s *studentServiceImpl) SetAdvisor(c *fiber.Ctx) error {
 	})
 }
 
-// ListStudents handles listing all students
+// FunctionName godoc
 // @Summary List all students
 // @Description Get paginated list of all students. Dosen Wali only sees their advisees.
 // @Tags Students
@@ -329,7 +327,7 @@ func (s *studentServiceImpl) ListStudents(c *fiber.Ctx) error {
 	})
 }
 
-// GetStudent handles getting student detail
+// FunctionName godoc
 // @Summary Get student detail
 // @Description Get detailed information of a student. Dosen Wali can only access their advisees.
 // @Tags Students
@@ -386,7 +384,7 @@ func (s *studentServiceImpl) GetStudent(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, "student retrieved successfully", student)
 }
 
-// GetStudentAchievements handles getting student achievements
+// FunctionName godoc
 // @Summary Get student achievements
 // @Description Get all achievements for a specific student. Dosen Wali can only access their advisees' achievements.
 // @Tags Students
