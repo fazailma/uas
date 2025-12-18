@@ -66,7 +66,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
 	}
-	
+
 	if req.Title == "" || req.AchievementType == "" {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "title and achievement_type are required")
 	}
@@ -697,7 +697,8 @@ func (s *achievementServiceImpl) buildStatistics(ctx context.Context, achievemen
 // @Security Bearer
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	dosenID := c.Locals("userID").(string)
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	// Get achievement first to update it properly
 	achievement, err := s.pgRepo.FindByID(achievementID)
@@ -710,21 +711,29 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "only submitted achievements can be verified")
 	}
 
-	// Verify that the dosen is the advisor of the student
-	student, err := s.studentRepo.FindByUserID(achievement.StudentID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+	// Only Dosen Wali and Admin can verify
+	if role == "Mahasiswa" {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "students cannot verify achievements")
 	}
 
-	// Get lecturer info to get lecturer ID
-	lecturer, err := s.lecturerRepo.FindByUserID(dosenID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
-	}
+	// If Dosen Wali, verify that they are the advisor of the student
+	if role == "Dosen Wali" {
+		student, err := s.studentRepo.FindByUserID(achievement.StudentID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+		}
 
-	if student.AdvisorID != lecturer.ID {
-		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can verify achievements")
+		// Get lecturer info to get lecturer ID
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
+		}
+
+		if student.AdvisorID != lecturer.ID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can verify achievements")
+		}
 	}
+	// Admin can verify all achievements (no additional check needed)
 
 	// Parse points from request body - accept both string and int
 	var reqBody map[string]interface{}
@@ -747,7 +756,7 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	// Update achievement status, verified_at, and verified_by
 	achievement.Status = "verified"
 	achievement.VerifiedAt = time.Now()
-	achievement.VerifiedBy = dosenID
+	achievement.VerifiedBy = userID
 	achievement.UpdatedAt = time.Now()
 
 	if err := s.pgRepo.Update(achievementID, achievement); err != nil {
@@ -786,7 +795,8 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 // @Security Bearer
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	dosenID := c.Locals("userID").(string)
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	var req struct {
 		RejectionNote string `json:"rejection_note" validate:"required"`
@@ -806,27 +816,35 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "only submitted achievements can be rejected")
 	}
 
-	// Verify that the dosen is the advisor of the student
-	student, err := s.studentRepo.FindByUserID(achievement.StudentID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+	// Only Dosen Wali and Admin can reject
+	if role == "Mahasiswa" {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "students cannot reject achievements")
 	}
 
-	// Get lecturer info to get lecturer ID
-	lecturer, err := s.lecturerRepo.FindByUserID(dosenID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
-	}
+	// If Dosen Wali, verify that they are the advisor of the student
+	if role == "Dosen Wali" {
+		student, err := s.studentRepo.FindByUserID(achievement.StudentID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "student not found")
+		}
 
-	if student.AdvisorID != lecturer.ID {
-		return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can reject achievements")
+		// Get lecturer info to get lecturer ID
+		lecturer, err := s.lecturerRepo.FindByUserID(userID)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "lecturer not found")
+		}
+
+		if student.AdvisorID != lecturer.ID {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "only the student's advisor can reject achievements")
+		}
 	}
+	// Admin can reject all achievements (no additional check needed)
 
 	// Update achievement status, rejection note, verified_at, and verified_by
 	achievement.Status = "rejected"
 	achievement.RejectionNote = req.RejectionNote
 	achievement.VerifiedAt = time.Now()
-	achievement.VerifiedBy = dosenID
+	achievement.VerifiedBy = userID
 	achievement.UpdatedAt = time.Now()
 
 	if err := s.pgRepo.Update(achievementID, achievement); err != nil {
